@@ -1,0 +1,35 @@
+{
+  "name": "captain-gai-sod-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "dev:server": "npm run build:server && node dist/server/index.js",
+    "build": "next build",
+    "build:server": "tsc -p tsconfig.server.json",
+    "start": "next start",
+    "start:server": "node dist/server/index.js",
+    "db:init": "npm run build:server && node dist/server/scripts/init-db.js",
+    "test:routes": "npm run build:server && node dist/server/scripts/route-smoke-test.js",
+    "lint": "tsc --noEmit && tsc -p tsconfig.server.json --noEmit"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "helmet": "^8.3.0",
+    "lucide-react": "^0.468.0",
+    "mysql2": "^3.23.2",
+    "next": "^16.3.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.3",
+    "@types/react-dom": "^19.0.2",
+    "typescript": "^5.7.2"
+  }
+}
