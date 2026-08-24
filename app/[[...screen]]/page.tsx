@@ -9,6 +9,7 @@ import InventoryScreen from "../_screens/InventoryScreen";
 import LoginScreen from "../_screens/LoginScreen";
 import NotificationsScreen from "../_screens/NotificationsScreen";
 import PosScreen from "../_screens/PosScreen";
+import ProductsScreen from "../_screens/ProductsScreen";
 import RecommendationsScreen from "../_screens/RecommendationsScreen";
 import SettingsScreen from "../_screens/SettingsScreen";
 
@@ -20,6 +21,7 @@ const routeScreens: Record<string, ComponentType> = {
   login: LoginScreen,
   notifications: NotificationsScreen,
   pos: PosScreen,
+  products: ProductsScreen,
   recommendations: RecommendationsScreen,
   settings: SettingsScreen,
 };
