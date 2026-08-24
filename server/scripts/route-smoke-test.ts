@@ -9,6 +9,7 @@ import { pool } from "../db/pool";
 let apiBase = "";
 const marker = Date.now().toString(36);
 const categoryName = `__route_test_category_${marker}`;
+const supplierName = `__route_test_supplier_${marker}`;
 const sku = `ROUTE-${marker}`.toUpperCase();
 const phone = `09${String(Date.now()).slice(-8)}`;
 const employeeEmail = `route-test-${marker}@example.com`;
@@ -74,9 +75,9 @@ async function cleanup(connection: mysql.Connection) {
   await connection.query("DELETE FROM categories WHERE category_name = ?", [categoryName]);
   await connection.query(`
     DELETE FROM suppliers
-    WHERE supplier_name = ?
+    WHERE supplier_name IN (?, ?)
       AND NOT EXISTS (SELECT 1 FROM goods_receipts WHERE goods_receipts.supplier_id = suppliers.supplier_id)
-  `, ["ผู้จำหน่ายทั่วไป"]);
+  `, ["ผู้จำหน่ายทั่วไป", supplierName]);
   await connection.query(`
     DELETE FROM cash_categories
     WHERE category_name = ?
@@ -122,6 +123,13 @@ async function run() {
     });
     const token = login.token;
 
+    const supplier = await api<{ id: number }>("/suppliers", token, {
+      method: "POST",
+      body: JSON.stringify({ name: supplierName, phone: "089-000-0000", address: "Route test address" }),
+    });
+    const supplierRows = await api<Array<{ id: number }>>(`/suppliers?search=${encodeURIComponent(supplierName)}`, token);
+    if (!supplierRows.some((row) => row.id === supplier.id)) throw new Error("Supplier was not returned by search");
+
     const employee = await api<{ id: number }>("/employees", token, {
       method: "POST",
       body: JSON.stringify({
@@ -157,20 +165,20 @@ async function run() {
         sku,
         name: "Route Test Product",
         categoryId: category.insertId,
+        supplierId: supplier.id,
         price: 50,
         unit: "ชิ้น",
         stockQuantity: 20,
         lowStockThreshold: 5,
       }),
     });
-    await api(`/products/${product.id}`, token);
     await api(`/products/${product.id}`, token, {
       method: "PATCH",
       body: JSON.stringify({ name: "Route Test Product Updated", price: 55, stockQuantity: 18 }),
     });
     await api("/inventory/movements", token, {
       method: "POST",
-      body: JSON.stringify({ productId: product.id, movementType: "purchase", quantity: 2, note: marker }),
+      body: JSON.stringify({ productId: product.id, movementType: "purchase", quantity: 2, supplierId: supplier.id, unitCost: 40, note: marker }),
     });
 
     const cashSale = await api<{ orderNumber: string }>("/orders", token, {
@@ -209,6 +217,7 @@ async function run() {
       tested: [
         "employees POST/PATCH/DELETE",
         "customers POST/PATCH/DELETE",
+        "suppliers GET/POST",
         "products POST/GET/PATCH/DELETE",
         "inventory GET/POST",
         "orders cash/qr/credit POST/GET",

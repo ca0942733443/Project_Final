@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   Lightbulb,
   Menu,
+  PackagePlus,
   Search,
   Settings,
   Store,
@@ -21,6 +22,7 @@ import { useEffect, useState } from "react";
 export type AdminSection =
   | "dashboard"
   | "pos"
+  | "products"
   | "inventory"
   | "recommendations"
   | "customers"
@@ -32,6 +34,7 @@ export type AdminSection =
 const navigation = [
   ["dashboard", "แดชบอร์ดสรุปรายได้", LayoutDashboard, "/"],
   ["pos", "หน้าจอขายหน้าร้าน", Store, "/pos"],
+  ["products", "จัดการสินค้า", PackagePlus, "/products"],
   ["inventory", "คลังสินค้า & สต็อกสินค้า", Boxes, "/inventory"],
   ["recommendations", "ระบบแนะนำการสั่งซื้อ", Lightbulb, "/recommendations"],
   ["customers", "บัญชีขายเชื่อ & ลูกค้าประจำ", WalletCards, "/customers"],

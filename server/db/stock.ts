@@ -37,6 +37,19 @@ async function defaultSupplierId(connection: PoolConnection) {
   return result.insertId;
 }
 
+async function selectedSupplierId(connection: PoolConnection, supplierId?: number | null) {
+  if (supplierId === undefined || supplierId === null) return defaultSupplierId(connection);
+  const [suppliers] = await connection.query<SupplierRow[]>(`
+    SELECT supplier_id AS supplierId
+    FROM suppliers
+    WHERE supplier_id = ?
+    LIMIT 1
+    FOR UPDATE
+  `, [supplierId]);
+  if (!suppliers[0]) throw new ApiError(404, "ไม่พบผู้จำหน่าย");
+  return suppliers[0].supplierId;
+}
+
 export async function receiveStock(
   connection: PoolConnection,
   input: {
@@ -44,6 +57,7 @@ export async function receiveStock(
     quantityBase: number;
     recordedBy: number;
     reference?: string | null;
+    supplierId?: number | null;
     movementType?: Extract<StockMovementType, "IN" | "ADJUSTMENT">;
     unitCost?: number;
   },
@@ -51,7 +65,7 @@ export async function receiveStock(
   const quantityBase = Number(input.quantityBase.toFixed(3));
   if (quantityBase <= 0) throw new ApiError(400, "จำนวนรับเข้าต้องมากกว่า 0");
 
-  const supplierId = await defaultSupplierId(connection);
+  const supplierId = await selectedSupplierId(connection, input.supplierId);
   const receiptNo = referenceNumber("GR");
   const lotNo = referenceNumber("LOT");
   const [receipt] = await connection.execute<ResultSetHeader>(`

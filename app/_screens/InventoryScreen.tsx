@@ -34,6 +34,8 @@ type InventoryMovement = {
   createdAt: string;
 };
 
+type Supplier = { id: number; name: string };
+
 const statusLabels = { normal: "ปกติ", low: "สต็อกต่ำ", out: "สินค้าหมด" } as const;
 
 export default function InventoryScreen() {
@@ -44,17 +46,20 @@ export default function InventoryScreen() {
   const [showReceive, setShowReceive] = useState(false);
   const [saving, setSaving] = useState(false);
   const [movements, setMovements] = useState<InventoryMovement[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
 
   const loadInventory = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const [inventoryData, movementRows] = await Promise.all([
+      const [inventoryData, movementRows, supplierRows] = await Promise.all([
         apiFetch<InventoryData>(`/inventory${status ? `?status=${status}` : ""}`),
         apiFetch<InventoryMovement[]>("/inventory/movements?limit=2"),
+        apiFetch<Supplier[]>("/suppliers"),
       ]);
       setData(inventoryData);
       setMovements(movementRows);
+      setSuppliers(supplierRows);
     } catch (loadError) {
       setError(errorMessage(loadError));
     } finally {
@@ -76,6 +81,8 @@ export default function InventoryScreen() {
           productId: Number(form.get("productId")),
           movementType: "purchase",
           quantity: Number(form.get("quantity")),
+          unitCost: Number(form.get("unitCost") || 0),
+          supplierId: form.get("supplierId") ? Number(form.get("supplierId")) : null,
           note: form.get("note"),
         }),
       });
@@ -114,6 +121,6 @@ export default function InventoryScreen() {
       {!loading && data?.items.length === 0 && <div className="api-message">ไม่พบสินค้าในสถานะที่เลือก</div>}
     </section>
     <section className="inventory-movement-card"><h2>ประวัติการเคลื่อนย้ายสินค้าล่าสุด</h2><div className="movement-list">{movements.map((movement, index) => <article className={`movement-item movement-${index % 2}`} key={movement.id}><span className="movement-icon">⇥</span><div><strong>{movement.movementType === "purchase" ? "รับเข้าคลัง" : movement.movementType === "sale" ? "ขายออกหน้าร้าน" : "ย้ายไปหน้าร้าน"}: {movement.productName}</strong><small>{movement.note ?? `อัปเดตเมื่อ ${new Date(movement.createdAt).toLocaleString("th-TH")}`}</small></div><b className={movement.quantity < 0 ? "danger-text" : ""}>{movement.quantity > 0 ? "+" : ""}{movement.quantity.toLocaleString("th-TH")} หน่วย</b></article>)}</div><button className="movement-link" type="button">ดูประวัติทั้งหมด</button></section>
-    {showReceive && <div className="modal-backdrop"><form className="modal" onSubmit={receiveStock}><button type="button" className="modal-close" onClick={() => setShowReceive(false)}><X /></button><h2>รับสินค้าเข้า</h2><label>สินค้า<select name="productId" required>{data?.items.map((item) => <option value={item.id} key={item.id}>{item.name} ({item.stockQuantity} {item.unit})</option>)}</select></label><label>จำนวนรับเข้า<input name="quantity" min="0.001" step="0.001" type="number" required /></label><label>หมายเหตุ<input name="note" placeholder="เช่น เลขที่ใบรับสินค้า" /></label><button className="primary-button" disabled={saving} type="submit">{saving ? "กำลังบันทึก..." : "บันทึกรับเข้า"}</button></form></div>}
+    {showReceive && <div className="modal-backdrop"><form className="modal" onSubmit={receiveStock}><button type="button" className="modal-close" onClick={() => setShowReceive(false)}><X /></button><h2>รับสินค้าเข้า</h2><label>สินค้า<select name="productId" required>{data?.items.map((item) => <option value={item.id} key={item.id}>{item.name} ({item.stockQuantity} {item.unit})</option>)}</select></label><label>จำนวนรับเข้า<input name="quantity" min="0.001" step="0.001" type="number" required /></label><label>ต้นทุนต่อหน่วย (บาท)<input name="unitCost" min="0" step="0.01" type="number" defaultValue="0" /></label><label>Supplier<select name="supplierId"><option value="">ใช้ผู้จำหน่ายทั่วไป</option>{suppliers.map((supplier) => <option value={supplier.id} key={supplier.id}>{supplier.name}</option>)}</select></label><label>หมายเหตุ<input name="note" placeholder="เช่น เลขที่ใบรับสินค้า" /></label><button className="primary-button" disabled={saving} type="submit">{saving ? "กำลังบันทึก..." : "บันทึกรับเข้า"}</button></form></div>}
   </AdminShell>;
 }
