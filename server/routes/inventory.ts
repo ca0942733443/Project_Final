@@ -42,6 +42,20 @@ type MovementType = typeof movementTypes[number];
 
 export const inventoryRouter = Router();
 
+function optionalId(value: unknown, fieldName: string) {
+  if (value === undefined || value === null || value === "") return null;
+  const id = Number(value);
+  if (!Number.isInteger(id) || id <= 0) throw new ApiError(400, `${fieldName}ไม่ถูกต้อง`);
+  return id;
+}
+
+function nonNegativeNumber(value: unknown, fieldName: string, fallback = 0) {
+  if (value === undefined || value === null || value === "") return fallback;
+  const numberValue = Number(value);
+  if (!Number.isFinite(numberValue) || numberValue < 0) throw new ApiError(400, `${fieldName}ต้องเป็นตัวเลขตั้งแต่ 0 ขึ้นไป`);
+  return numberValue;
+}
+
 inventoryRouter.get("/movements", asyncHandler(async (request, response) => {
   const requestedLimit = Number(request.query.limit ?? 50);
   const limit = Number.isInteger(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 200) : 50;
@@ -69,7 +83,7 @@ inventoryRouter.get("/movements", asyncHandler(async (request, response) => {
 }));
 
 inventoryRouter.post("/movements", asyncHandler(async (request, response) => {
-  const body = request.body as { productId?: unknown; movementType?: unknown; quantity?: unknown; note?: unknown };
+  const body = request.body as { productId?: unknown; movementType?: unknown; quantity?: unknown; note?: unknown; supplierId?: unknown; unitCost?: unknown };
   const productId = Number(body.productId);
   const quantity = Number(body.quantity);
   if (!Number.isInteger(productId) || productId <= 0) throw new ApiError(400, "รหัสสินค้าไม่ถูกต้อง");
@@ -86,6 +100,8 @@ inventoryRouter.post("/movements", asyncHandler(async (request, response) => {
   const note = typeof body.note === "string" && body.note.trim()
     ? body.note.trim().slice(0, 100)
     : null;
+  const supplierId = optionalId(body.supplierId, "รหัสผู้จำหน่าย");
+  const unitCost = nonNegativeNumber(body.unitCost, "ต้นทุนต่อหน่วย");
   const recordedBy = authenticatedUserId(response);
 
   const connection = await pool.getConnection();
@@ -109,6 +125,8 @@ inventoryRouter.post("/movements", asyncHandler(async (request, response) => {
         recordedBy,
         reference: note,
         movementType: movementType === "adjustment" ? "ADJUSTMENT" : "IN",
+        supplierId,
+        unitCost,
       });
       movementId = received.movementId;
       stockQuantity = await currentStockBase(connection, productId);

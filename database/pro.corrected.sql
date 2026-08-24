@@ -70,10 +70,13 @@ ENGINE = InnoDB;
 CREATE TABLE IF NOT EXISTS `captain_kai_sod_db`.`products` (
   `product_id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
   `category_id` INT UNSIGNED NOT NULL,
+  `supplier_id` INT UNSIGNED NULL DEFAULT NULL,
   `sku` VARCHAR(50) NOT NULL,
   `product_name` VARCHAR(200) NOT NULL,
   `base_unit` VARCHAR(30) NOT NULL COMMENT 'หน่วยฐานสำหรับตัดสต็อก เช่น กิโลกรัม',
   `reorder_point` DECIMAL(14,3) NOT NULL DEFAULT 0,
+  `image_url` VARCHAR(500) NULL DEFAULT NULL,
+  `image_public_id` VARCHAR(255) NULL DEFAULT NULL,
   `is_active` TINYINT NOT NULL DEFAULT TRUE,
   PRIMARY KEY (`product_id`),
   UNIQUE INDEX `uq_products_sku` (`sku` ASC) VISIBLE,
