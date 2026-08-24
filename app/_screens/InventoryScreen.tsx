@@ -109,9 +109,26 @@ export default function InventoryScreen() {
 
   return <AdminShell active="inventory">
     <PageTitle title="การจัดการคลังสินค้า" subtitle="ตรวจสอบและจัดการสต็อกจากฐานข้อมูลจริง" action={<button className="primary-button" onClick={() => setShowReceive(true)}><PackageCheck size={17} /> รับสินค้าเข้า</button>} />
-    <div className="stat-grid four"><Stat label="มูลค่าสินค้าในคลังทั้งหมด" value={`฿${(stats?.totalStockValue ?? 0).toLocaleString("th-TH", { maximumFractionDigits: 2 })}`} /><Stat label="จำนวนรายการสินค้า" value={`${stats?.productCount ?? 0} รายการ`} tone="neutral" /><Stat label="สินค้าสต็อกต่ำ" value={`${stats?.lowStockCount ?? 0}`} tone="orange" note="ควรเติมสินค้าทันที" /><Stat label="สินค้าหมด" value={`${stats?.outOfStockCount ?? 0}`} tone="red" /></div>
+    <div className="stat-grid four">
+      <Stat label="มูลค่าสินค้าในคลังทั้งหมด" value={`฿${(stats?.totalStockValue ?? 0).toLocaleString("th-TH", { maximumFractionDigits: 2 })}`} />
+      <Stat label="จำนวนรายการสินค้า" value={`${stats?.productCount ?? 0} รายการ`} tone="neutral" />
+      <Stat label="สินค้าสต็อกต่ำ" value={`${stats?.lowStockCount ?? 0}`} tone="orange" note="ควรเติมสินค้าทันที" />
+      <Stat label="สินค้าหมด" value={`${stats?.outOfStockCount ?? 0}`} tone="red" />
+    </div>
     <section className="data-card inventory-stock-card">
-      <div className="table-tools"><select aria-label="หมวดหมู่"><option>ทุกหมวดหมู่</option></select><select value={status} onChange={event => setStatus(event.target.value)}><option value="">สถานะ: ทั้งหมด</option><option value="normal">สถานะ: ปกติ</option><option value="low">สถานะ: สต็อกต่ำ</option><option value="out">สถานะ: สินค้าหมด</option></select><button onClick={exportCsv}><Download size={15} /> ส่งออก</button></div>
+      <div className="table-tools">
+        <select aria-label="หมวดหมู่">
+          <option>ทุกหมวดหมู่</option>
+        </select>
+        <select value={status} onChange={event => setStatus(event.target.value)}>
+          <option value="">สถานะ: ทั้งหมด</option>
+          <option value="normal">สถานะ: ปกติ</option>
+          <option value="low">สถานะ: สต็อกต่ำ</option>
+          <option value="out">สถานะ: สินค้าหมด</option>
+        </select>
+        <button onClick={exportCsv}>
+          <Download size={15} /> ส่งออก</button>
+        </div>
       {loading && <div className="api-message">กำลังโหลดข้อมูลสต็อก...</div>}
       {error && <div className="api-message error">{error}</div>}
       <div className="inventory-table">

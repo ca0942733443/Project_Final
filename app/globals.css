@@ -215,6 +215,9 @@ td { height: 61px; padding: 0 20px; text-align: center; border-top: 1px solid #e
 .section-inventory > .subpage-heading, .section-inventory > .stat-grid, .section-inventory > .data-card { width: 100%; max-width: 934px; }
 .section-inventory .subpage-heading .primary-button { min-width: 139px; min-height: 56px; }
 .section-inventory .stat-grid.four { grid-template-columns: repeat(4, minmax(0, 210px)); justify-content: space-between; gap: 0; }
+.section-inventory .mini-stat { position: relative; justify-content: flex-start; }
+.section-inventory .mini-stat strong { position: absolute; top: 50%; margin-top: 0; transform: translateY(-50%); }
+.section-inventory .mini-stat small { position: absolute; bottom: 24px; margin-top: 0; }
 .section-inventory .data-card { margin-top: 0; overflow: visible; border: 0; border-radius: 0; background: transparent; }
 .section-inventory .table-tools { min-height: 74px; border: 1px solid var(--border); border-radius: 11px; }
 .section-inventory .inventory-table { overflow: hidden; border: 1px solid var(--border); border-radius: 11px; background: #fff; margin-top: 17px; }
