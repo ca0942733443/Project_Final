@@ -28,4 +28,11 @@ export const env = Object.freeze({
     name: process.env.DB_NAME ?? "captain_kai_sod_db",
     connectionLimit: readInteger("DB_CONNECTION_LIMIT", 10),
   },
+  imageStorage: {
+    provider: (process.env.IMAGE_STORAGE_PROVIDER ?? "cloudinary").trim().toLowerCase(),
+    cloudName: (process.env.CLOUDINARY_CLOUD_NAME ?? "").trim(),
+    apiKey: (process.env.CLOUDINARY_API_KEY ?? "").trim(),
+    apiSecret: (process.env.CLOUDINARY_API_SECRET ?? "").trim(),
+    folder: (process.env.CLOUDINARY_FOLDER ?? "products").trim() || "products",
+  },
 });
