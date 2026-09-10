@@ -1,6 +1,6 @@
 "use client";
 
-import { PackageCheck, Plus, X, Image as ImageIcon } from "lucide-react";
+import { Download, PackageCheck, Plus, X, Image as ImageIcon } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import AdminShell from "../_components/AdminShell";
 import { PageTitle, Stat } from "../_components/PageElements";
@@ -12,6 +12,7 @@ type InventoryItem = {
   sku: string;
   name: string;
   categoryName: string;
+  imageUrl: string | null;
   stockQuantity: number;
   lowStockThreshold: number;
   unit: string;
@@ -130,8 +131,18 @@ export default function InventoryScreen() {
 
   const selectedProduct = data?.items.find((item) => item.id === (selectedProductId ?? data?.items[0]?.id));
   const stats = data?.stats;
+  const exportCsv = () => {
+    if (!data) return;
+    const rows = [["SKU", "สินค้า", "หมวดหมู่", "คงเหลือ", "หน่วย", "มูลค่า"], ...data.items.map((item) => [item.sku, item.name, item.categoryName, item.stockQuantity, item.unit, item.stockValue])];
+    const csv = rows.map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(",")).join("\n");
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" }));
+    link.download = "inventory.csv";
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
 
-  return <AdminShell active="inventory">
+  return (<AdminShell active="inventory">
     <PageTitle title="การจัดการคลังสินค้า" subtitle="ตรวจสอบและจัดการสต็อกจากฐานข้อมูลจริง" action={<button className="primary-button" onClick={() => setShowReceive(true)}><PackageCheck size={17} /> รับสินค้าเข้า</button>} />
     <div className="stat-grid four"><Stat label="มูลค่าสินค้าในคลังทั้งหมด" value={`฿${(stats?.totalStockValue ?? 0).toLocaleString("th-TH", { maximumFractionDigits: 2 })}`} /><Stat label="จำนวนรายการสินค้า" value={`${stats?.productCount ?? 0} รายการ`} tone="neutral" /><Stat label="สินค้าสต็อกต่ำ" value={`${stats?.lowStockCount ?? 0}`} tone="orange" note="ควรเติมสินค้าทันที" /><Stat label="สินค้าหมด" value={`${stats?.outOfStockCount ?? 0}`} tone="red" /></div>
     <section className="data-card inventory-stock-card">
@@ -233,8 +244,6 @@ export default function InventoryScreen() {
               </thead>
               <tbody>
                 {paginatedItems.map((item) => {
-                  const itemImg = item.imageUrl;
-
                   let statusText = "ปกติ";
                   let statusStyle: React.CSSProperties = {
                     backgroundColor: "#e6f4ea",
@@ -454,6 +463,7 @@ export default function InventoryScreen() {
 
         {!loading && data?.items.length === 0 && <div className="api-message">ไม่พบสินค้าในสถานะที่เลือก</div>}
       </section>
+    </section>
 
       {/* ประวัติการเคลื่อนย้ายสินค้า */}
       <section className="inventory-movement-card">

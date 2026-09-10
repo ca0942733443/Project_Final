@@ -11,6 +11,7 @@ interface InventoryRow extends RowDataPacket {
   sku: string;
   name: string;
   categoryName: string;
+  imageUrl: string | null;
   stockQuantity: number;
   lowStockThreshold: number;
   unit: string;
@@ -180,14 +181,14 @@ inventoryRouter.get("/", asyncHandler(async (request, response) => {
   }
 
   // 3. จัดเรียงข้อมูล (Sort)
-  let orderByClause = "CASE WHEN stock.minExpiryDate IS NULL THEN 1 ELSE 0 END, stock.minExpiryDate ASC, p.product_id DESC";
+  let orderByClause = "CASE WHEN stock.expiryDate IS NULL THEN 1 ELSE 0 END, stock.expiryDate ASC, p.product_id DESC";
 
   if (sortBy === "stockDesc") {
     orderByClause = `${stockExpression} DESC, p.product_id DESC`;
   } else if (sortBy === "stockAsc") {
     orderByClause = `${stockExpression} ASC, p.product_id ASC`;
   } else if (sortBy === "expiryAsc") {
-    orderByClause = "CASE WHEN stock.minExpiryDate IS NULL THEN 1 ELSE 0 END, stock.minExpiryDate ASC, p.product_id DESC";
+    orderByClause = "CASE WHEN stock.expiryDate IS NULL THEN 1 ELSE 0 END, stock.expiryDate ASC, p.product_id DESC";
   }
 
 const [items] = await pool.query<InventoryRow[]>(`
@@ -196,6 +197,7 @@ const [items] = await pool.query<InventoryRow[]>(`
       p.sku,
       p.product_name AS name,
       c.category_name AS categoryName,
+      p.image_url AS imageUrl,
       ${stockExpression} AS stockQuantity,
       p.reorder_point AS lowStockThreshold,
       p.base_unit AS unit,
@@ -231,6 +233,7 @@ const [items] = await pool.query<InventoryRow[]>(`
         MIN(CASE WHEN pb.status IN ('ACTIVE', 'NEAR_EXPIRY') AND pb.quantity_remaining_base > 0 THEN pb.expiry_date END) AS expiryDate,
         MAX(sm.moved_at) AS updatedAt
       FROM product_batches pb
+      LEFT JOIN stock_movements sm ON sm.batch_id = pb.batch_id
       GROUP BY pb.product_id
     ) stock ON stock.product_id = p.product_id
     WHERE ${conditions.join(" AND ")}
