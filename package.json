@@ -14,6 +14,7 @@
     "lint": "tsc --noEmit && tsc -p tsconfig.server.json --noEmit"
   },
   "dependencies": {
+    "@types/qrcode": "^1.5.6",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
@@ -21,6 +22,7 @@
     "lucide-react": "^0.468.0",
     "mysql2": "^3.23.2",
     "next": "^16.3.0",
+    "qrcode": "^1.5.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

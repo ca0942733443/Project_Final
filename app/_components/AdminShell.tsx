@@ -4,6 +4,7 @@ import {
   Bell,
   Boxes,
   ChevronDown,
+  ClipboardList,
   Clock3,
   LayoutDashboard,
   Lightbulb,
@@ -19,11 +20,14 @@ import {
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+export const THEME_STORAGE_KEY = "captain-gai-sod-theme";
+
 export type AdminSection =
   | "dashboard"
   | "pos"
   | "products"
   | "inventory"
+  | "inventory-orders"
   | "recommendations"
   | "customers"
   | "employees"
@@ -36,6 +40,7 @@ const navigation = [
   ["pos", "หน้าจอขายหน้าร้าน", Store, "/pos"],
   ["products", "จัดการสินค้า", PackagePlus, "/products"],
   ["inventory", "คลังสินค้า & สต็อกสินค้า", Boxes, "/inventory"],
+  ["inventory-orders", "คำสั่งซื้อสินค้าคงคลัง", ClipboardList, "/inventory-orders"],
   ["recommendations", "ระบบแนะนำการสั่งซื้อ", Lightbulb, "/recommendations"],
   ["customers", "บัญชีขายเชื่อ & ลูกค้าประจำ", WalletCards, "/customers"],
   ["employees", "จัดการบัญชีพนักงาน", Users, "/employees"],
@@ -59,6 +64,11 @@ export default function AdminShell({
     const storedUser = window.sessionStorage.getItem("authUser");
     if (!storedUser) return;
     try { setUser(JSON.parse(storedUser)); } catch { window.sessionStorage.removeItem("authUser"); }
+  }, []);
+
+  useEffect(() => {
+    const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+    document.documentElement.classList.toggle("dark-mode", storedTheme === "dark");
   }, []);
 
   const logout = () => {
