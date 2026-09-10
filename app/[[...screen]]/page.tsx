@@ -7,6 +7,7 @@ import EmployeesScreen from "../_screens/EmployeesScreen";
 import HistoryScreen from "../_screens/HistoryScreen";
 import InvenHistoryScreen from "../_screens/InvenHistoryScreen";
 import InventoryScreen from "../_screens/InventoryScreen";
+import InventoryOrdersScreen from "../_screens/InventoryOrdersScreen";
 import LoginScreen from "../_screens/LoginScreen";
 import NotificationsScreen from "../_screens/NotificationsScreen";
 import PosScreen from "../_screens/PosScreen";
@@ -19,7 +20,7 @@ const routeScreens: Record<string, ComponentType> = {
   employees: EmployeesScreen,
   history: HistoryScreen,
   inventory: InventoryScreen,
-  "inven-history": InvenHistoryScreen,
+  "inventory-orders": InventoryOrdersScreen,
   login: LoginScreen,
   notifications: NotificationsScreen,
   pos: PosScreen,

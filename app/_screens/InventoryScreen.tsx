@@ -18,8 +18,9 @@ type InventoryItem = {
   price: number;
   stockValue: number;
   status: "out" | "low" | "normal";
-  expiryDate?: string | Date | null;
-  imageUrl?: string | null; 
+  lotNo: string | null;
+  expiryDate: string | null;
+  updatedAt?: string;
 };
 
 type InventoryData = {
@@ -35,6 +36,15 @@ type InventoryMovement = {
   note: string | null;
   createdAt: string;
 };
+
+type Supplier = { id: number; name: string };
+
+const statusLabels = { normal: "ปกติ", low: "สต็อกต่ำ", out: "สินค้าหมด" } as const;
+
+function formatExpiryDate(value: string | null) {
+  if (!value) return "ไม่ระบุ";
+  return new Date(value).toLocaleDateString("th-TH", { day: "2-digit", month: "short", year: "numeric" });
+}
 
 export default function InventoryScreen() {
   const [search, setSearch] = useState("");
@@ -121,23 +131,16 @@ export default function InventoryScreen() {
   const selectedProduct = data?.items.find((item) => item.id === (selectedProductId ?? data?.items[0]?.id));
   const stats = data?.stats;
 
-  return (
-    <AdminShell active="inventory">
-      <PageTitle 
-        title="การจัดการคลังสินค้า" 
-        subtitle="ตรวจสอบและจัดการสต็อกจากฐานข้อมูลจริง" 
-        action={
-          <button className="primary-button" onClick={() => setShowReceive(true)}>
-            <PackageCheck size={17} /> รับสินค้าเข้า
-          </button>
-        } 
-      />
-
-      <div className="stat-grid four">
-        <Stat label="มูลค่าสินค้าในคลังทั้งหมด" value={`฿${(stats?.totalStockValue ?? 0).toLocaleString("th-TH", { maximumFractionDigits: 2 })}`} />
-        <Stat label="จำนวนรายการสินค้า" value={`${stats?.productCount ?? 0} รายการ`} tone="neutral" />
-        <Stat label="สินค้าสต็อกต่ำ" value={`${stats?.lowStockCount ?? 0} รายการ`} tone="orange" note="ควรตรวจสอบสต็อก" />
-        <Stat label="สินค้าหมด" value={`${stats?.outOfStockCount ?? 0} รายการ`} tone="red" />
+  return <AdminShell active="inventory">
+    <PageTitle title="การจัดการคลังสินค้า" subtitle="ตรวจสอบและจัดการสต็อกจากฐานข้อมูลจริง" action={<button className="primary-button" onClick={() => setShowReceive(true)}><PackageCheck size={17} /> รับสินค้าเข้า</button>} />
+    <div className="stat-grid four"><Stat label="มูลค่าสินค้าในคลังทั้งหมด" value={`฿${(stats?.totalStockValue ?? 0).toLocaleString("th-TH", { maximumFractionDigits: 2 })}`} /><Stat label="จำนวนรายการสินค้า" value={`${stats?.productCount ?? 0} รายการ`} tone="neutral" /><Stat label="สินค้าสต็อกต่ำ" value={`${stats?.lowStockCount ?? 0}`} tone="orange" note="ควรเติมสินค้าทันที" /><Stat label="สินค้าหมด" value={`${stats?.outOfStockCount ?? 0}`} tone="red" /></div>
+    <section className="data-card inventory-stock-card">
+      <div className="table-tools"><select aria-label="หมวดหมู่"><option>ทุกหมวดหมู่</option></select><select value={status} onChange={event => setStatus(event.target.value)}><option value="">สถานะ: ทั้งหมด</option><option value="normal">สถานะ: ปกติ</option><option value="low">สถานะ: สต็อกต่ำ</option><option value="out">สถานะ: สินค้าหมด</option></select><button onClick={exportCsv}><Download size={15} /> ส่งออก</button></div>
+      {loading && <div className="api-message">กำลังโหลดข้อมูลสต็อก...</div>}
+      {error && <div className="api-message error">{error}</div>}
+      <div className="inventory-table">
+        <div className="table-wrap"><table><thead><tr>{["สินค้า", "SKU", "คงเหลือ", "มูลค่าสต็อก", "ล็อต", "หมดอายุ", "สถานะสต็อก"].map(title => <th key={title}>{title}</th>)}</tr></thead><tbody>{data?.items.slice(0, 3).map(item => <tr className={item.status === "out" ? "expired-row" : ""} key={item.id}><td>{item.name}</td><td>{item.sku}</td><td className={item.status !== "normal" ? "danger-text" : ""}>{item.stockQuantity.toLocaleString("th-TH")} {item.unit}</td><td>฿{item.stockValue.toLocaleString("th-TH", { minimumFractionDigits: 2 })}</td><td>{item.lotNo ?? "—"}</td><td>{formatExpiryDate(item.expiryDate)}</td><td><span className={`status-pill ${item.status === "out" ? "s-2" : item.status === "low" ? "s-1" : "s-0"}`}>{statusLabels[item.status]}</span></td></tr>)}</tbody></table></div>
+        <div className="pagination"><span>แสดง {data?.items.length ? 1 : 0} ถึง {data?.items.length ?? 0} จาก {data?.items.length ?? 0} รายการ</span><div><button aria-label="หน้าก่อนหน้า" disabled>‹</button><button className="selected" aria-current="page">1</button><button aria-label="หน้าถัดไป" disabled>›</button></div></div>
       </div>
 
       <section className="data-card inventory-stock-card">

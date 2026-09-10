@@ -14,7 +14,7 @@ interface EmployeeRow extends RowDataPacket {
   fullName: string;
   role: EmployeeRole;
   isActive: number;
-  createdAt: Date | null;
+  lastLoginAt: Date | null;
 }
 
 interface EmployeeStatsRow extends RowDataPacket {
@@ -77,7 +77,7 @@ employeesRouter.get("/", asyncHandler(async (request, response) => {
       u.full_name AS fullName,
       LOWER(r.role_name) AS role,
       (u.status = 'ACTIVE') AS isActive,
-      u.last_login_at AS createdAt
+      u.last_login_at AS lastLoginAt
     FROM users u
     INNER JOIN roles r ON r.role_id = u.role_id
     ${includeInactive ? "" : "WHERE u.status = 'ACTIVE'"}
