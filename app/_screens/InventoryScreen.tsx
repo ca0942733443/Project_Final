@@ -17,6 +17,8 @@ type InventoryItem = {
   price: number;
   stockValue: number;
   status: "out" | "low" | "normal";
+  lotNo: string | null;
+  expiryDate: string | null;
   updatedAt?: string;
 };
 
@@ -37,6 +39,11 @@ type InventoryMovement = {
 type Supplier = { id: number; name: string };
 
 const statusLabels = { normal: "ปกติ", low: "สต็อกต่ำ", out: "สินค้าหมด" } as const;
+
+function formatExpiryDate(value: string | null) {
+  if (!value) return "ไม่ระบุ";
+  return new Date(value).toLocaleDateString("th-TH", { day: "2-digit", month: "short", year: "numeric" });
+}
 
 export default function InventoryScreen() {
   const [status, setStatus] = useState("");
@@ -115,7 +122,7 @@ export default function InventoryScreen() {
       {loading && <div className="api-message">กำลังโหลดข้อมูลสต็อก...</div>}
       {error && <div className="api-message error">{error}</div>}
       <div className="inventory-table">
-        <div className="table-wrap"><table><thead><tr>{["สินค้า", "ล็อต", "คลัง", "หน้าร้าน", "หมดอายุ", "สถานะ", ""].map(title => <th key={title}>{title}</th>)}</tr></thead><tbody>{data?.items.slice(0, 3).map(item => <tr className={item.status === "out" ? "expired-row" : ""} key={item.id}><td>{item.name}</td><td>{item.sku}</td><td className={item.status !== "normal" ? "danger-text" : ""}>{item.stockQuantity.toLocaleString("th-TH")}</td><td>{item.status === "out" ? 0 : Math.min(item.stockQuantity, item.lowStockThreshold)}</td><td className={item.status === "low" ? "danger-text" : ""}>{item.updatedAt ? new Date(item.updatedAt).toLocaleDateString("th-TH", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</td><td><span className={`status-pill ${item.status === "out" ? "s-2" : item.status === "low" ? "s-1" : "s-0"}`}>{item.status === "out" ? "สต็อกสินค้า: หมดอายุ" : item.status === "low" ? "ใกล้หมดอายุ (7 วัน)" : "ปกติ"}</span></td><td className="more-cell">⋮</td></tr>)}</tbody></table></div>
+        <div className="table-wrap"><table><thead><tr>{["สินค้า", "SKU", "คงเหลือ", "มูลค่าสต็อก", "ล็อต", "หมดอายุ", "สถานะสต็อก"].map(title => <th key={title}>{title}</th>)}</tr></thead><tbody>{data?.items.slice(0, 3).map(item => <tr className={item.status === "out" ? "expired-row" : ""} key={item.id}><td>{item.name}</td><td>{item.sku}</td><td className={item.status !== "normal" ? "danger-text" : ""}>{item.stockQuantity.toLocaleString("th-TH")} {item.unit}</td><td>฿{item.stockValue.toLocaleString("th-TH", { minimumFractionDigits: 2 })}</td><td>{item.lotNo ?? "—"}</td><td>{formatExpiryDate(item.expiryDate)}</td><td><span className={`status-pill ${item.status === "out" ? "s-2" : item.status === "low" ? "s-1" : "s-0"}`}>{statusLabels[item.status]}</span></td></tr>)}</tbody></table></div>
         <div className="pagination"><span>แสดง {data?.items.length ? 1 : 0} ถึง {data?.items.length ?? 0} จาก {data?.items.length ?? 0} รายการ</span><div><button aria-label="หน้าก่อนหน้า" disabled>‹</button><button className="selected" aria-current="page">1</button><button aria-label="หน้าถัดไป" disabled>›</button></div></div>
       </div>
       {!loading && data?.items.length === 0 && <div className="api-message">ไม่พบสินค้าในสถานะที่เลือก</div>}

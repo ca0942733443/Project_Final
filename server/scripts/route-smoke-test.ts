@@ -13,6 +13,7 @@ const supplierName = `__route_test_supplier_${marker}`;
 const sku = `ROUTE-${marker}`.toUpperCase();
 const phone = `09${String(Date.now()).slice(-8)}`;
 const employeeEmail = `route-test-${marker}@example.com`;
+const inventoryOrderNote = `route-test-order-${marker}`;
 
 type ApiEnvelope<T> = { success: boolean; data: T };
 
@@ -28,6 +29,7 @@ async function api<T>(path: string, token?: string, init?: RequestInit) {
 }
 
 async function cleanup(connection: mysql.Connection) {
+  await connection.query("DELETE FROM order_recommendations WHERE note = ?", [inventoryOrderNote]);
   const [productRows] = await connection.query<Array<mysql.RowDataPacket & { id: number }>>(
     "SELECT product_id AS id FROM products WHERE sku = ?",
     [sku],
@@ -91,8 +93,6 @@ async function cleanup(connection: mysql.Connection) {
     WHERE role_name IN ('cashier', 'stock')
       AND NOT EXISTS (SELECT 1 FROM users WHERE users.role_id = roles.role_id)
   `);
-  await connection.query("DELETE FROM location WHERE location_id = 1 AND location_name = ? AND NOT EXISTS (SELECT 1 FROM customers WHERE location_location_id = 1)", ["ไม่ระบุ"]);
-  await connection.query("DELETE FROM car_type WHERE car_type_id = 1 AND ca_rtype_name = ? AND NOT EXISTS (SELECT 1 FROM customers WHERE car_type_car_type_id = 1)", ["ไม่ระบุ"]);
 }
 
 async function run() {
@@ -122,6 +122,8 @@ async function run() {
       body: JSON.stringify({ email: "captain@gmail.com", password: "captain123" }),
     });
     const token = login.token;
+    const customerOptions = await api<{ locations: Array<{ id: number }>; carTypes: Array<{ id: number }> }>("/customers/options", token);
+    if (!Array.isArray(customerOptions.locations) || !Array.isArray(customerOptions.carTypes)) throw new Error("Customer options response is invalid");
 
     const supplier = await api<{ id: number }>("/suppliers", token, {
       method: "POST",
@@ -148,15 +150,18 @@ async function run() {
     const customer = await api<{ id: number }>("/customers", token, {
       method: "POST",
       body: JSON.stringify({
-        customerCode: `TEST-${marker}`,
         fullName: "Route Test Customer",
         phone,
+        vehiclePlate: "กก-1234",
+        parkingSpot: "A-01",
+        ...(customerOptions.locations[0] ? { locationId: customerOptions.locations[0].id } : {}),
+        ...(customerOptions.carTypes[0] ? { carTypeId: customerOptions.carTypes[0].id } : {}),
         creditLimit: 1000,
       }),
     });
     await api(`/customers/${customer.id}`, token, {
       method: "PATCH",
-      body: JSON.stringify({ fullName: "Route Test Customer Updated", creditLimit: 1200 }),
+      body: JSON.stringify({ fullName: "Route Test Customer Updated", vehiclePlate: "กก-5678", creditLimit: 1200 }),
     });
 
     const product = await api<{ id: number }>("/products", token, {
@@ -180,6 +185,17 @@ async function run() {
       method: "POST",
       body: JSON.stringify({ productId: product.id, movementType: "purchase", quantity: 2, supplierId: supplier.id, unitCost: 40, note: marker }),
     });
+
+    const inventoryOrder = await api<{ id: number }>("/inventory-orders", token, {
+      method: "POST",
+      body: JSON.stringify({ note: inventoryOrderNote, items: [{ productId: product.id, quantity: 4 }] }),
+    });
+    const inventoryOrderList = await api<{ items: Array<{ id: number }> }>(`/inventory-orders?search=${encodeURIComponent(inventoryOrderNote)}`, token);
+    if (!inventoryOrderList.items.some((order) => order.id === inventoryOrder.id)) throw new Error("Inventory order was not returned by search");
+    const inventoryOrderDetail = await api<{ items: Array<{ productId: number }> }>(`/inventory-orders/${inventoryOrder.id}`, token);
+    if (!inventoryOrderDetail.items.some((item) => item.productId === product.id)) throw new Error("Inventory order detail is missing its product");
+    await api(`/inventory-orders/${inventoryOrder.id}`, token, { method: "PATCH", body: JSON.stringify({ status: "PENDING_APPROVAL" }) });
+    await api(`/inventory-orders/${inventoryOrder.id}`, token, { method: "PATCH", body: JSON.stringify({ status: "APPROVED" }) });
 
     const cashSale = await api<{ orderNumber: string }>("/orders", token, {
       method: "POST",
@@ -220,6 +236,7 @@ async function run() {
         "suppliers GET/POST",
         "products POST/GET/PATCH/DELETE",
         "inventory GET/POST",
+        "inventory-orders GET/POST/PATCH/detail",
         "orders cash/qr/credit POST/GET",
         "dashboard/categories read routes",
       ],

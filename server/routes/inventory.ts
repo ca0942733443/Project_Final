@@ -17,6 +17,8 @@ interface InventoryRow extends RowDataPacket {
   price: number;
   stockValue: number;
   status: "out" | "low" | "normal";
+  lotNo: string | null;
+  expiryDate: Date | null;
   updatedAt: Date | null;
 }
 
@@ -189,6 +191,8 @@ inventoryRouter.get("/", asyncHandler(async (request, response) => {
         WHEN ${stockExpression} <= p.reorder_point THEN 'low'
         ELSE 'normal'
       END AS status,
+      stock.lotNo,
+      stock.expiryDate,
       stock.updatedAt
     FROM products p
     INNER JOIN categories c ON c.category_id = p.category_id
@@ -203,6 +207,12 @@ inventoryRouter.get("/", asyncHandler(async (request, response) => {
       SELECT
         pb.product_id,
         SUM(CASE WHEN pb.status IN ('ACTIVE', 'NEAR_EXPIRY') THEN pb.quantity_remaining_base ELSE 0 END) AS stockQuantity,
+        SUBSTRING_INDEX(GROUP_CONCAT(
+          CASE WHEN pb.status IN ('ACTIVE', 'NEAR_EXPIRY') AND pb.quantity_remaining_base > 0 THEN pb.lot_no END
+          ORDER BY pb.expiry_date IS NULL ASC, pb.expiry_date ASC, pb.received_date ASC, pb.batch_id ASC
+          SEPARATOR ','
+        ), ',', 1) AS lotNo,
+        MIN(CASE WHEN pb.status IN ('ACTIVE', 'NEAR_EXPIRY') AND pb.quantity_remaining_base > 0 THEN pb.expiry_date END) AS expiryDate,
         MAX(sm.moved_at) AS updatedAt
       FROM product_batches pb
       LEFT JOIN stock_movements sm ON sm.batch_id = pb.batch_id

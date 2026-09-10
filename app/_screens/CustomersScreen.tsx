@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, RotateCcw, X } from "lucide-react";
+import { Download, Pencil, Trash2, UserPlus, X } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 import AdminShell from "../_components/AdminShell";
 import { PageTitle, Stat } from "../_components/PageElements";
@@ -11,12 +11,23 @@ type Customer = {
   customerCode: string;
   fullName: string;
   phone: string | null;
+  vehiclePlate: string | null;
+  parkingSpot: string | null;
+  locationId: number | null;
+  locationName: string | null;
+  carTypeId: number | null;
+  carTypeName: string | null;
   creditLimit: number;
   balanceDue: number;
   orderCount: number;
   totalSpent: number;
   favoriteProduct: string | null;
   lastPurchaseAt: string | null;
+};
+
+type CustomerOptions = {
+  locations: Array<{ id: number; name: string | null }>;
+  carTypes: Array<{ id: number; name: string | null }>;
 };
 
 type CustomerStats = {
@@ -34,24 +45,33 @@ function memberLevel(totalSpent: number) {
   return "ทั่วไป";
 }
 
+function money(value: number) {
+  return Number(value ?? 0).toLocaleString("th-TH", { minimumFractionDigits: 2 });
+}
+
 export default function CustomersScreen() {
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [options, setOptions] = useState<CustomerOptions>({ locations: [], carTypes: [] });
   const [stats, setStats] = useState<CustomerStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const loadCustomers = async () => {
     setLoading(true);
     setError("");
     try {
-      const [customerRows, customerStats] = await Promise.all([
+      const [customerRows, customerStats, customerOptions] = await Promise.all([
         apiFetch<Customer[]>("/customers"),
         apiFetch<CustomerStats>("/customers/stats"),
+        apiFetch<CustomerOptions>("/customers/options"),
       ]);
       setCustomers(customerRows);
       setStats(customerStats);
+      setOptions(customerOptions);
     } catch (loadError) {
       setError(errorMessage(loadError));
     } finally {
@@ -61,22 +81,42 @@ export default function CustomersScreen() {
 
   useEffect(() => { void loadCustomers(); }, []);
 
-  const createCustomer = async (event: FormEvent<HTMLFormElement>) => {
+  const openCreateForm = () => {
+    setEditingCustomer(null);
+    setShowForm(true);
+  };
+
+  const openEditForm = (customer: Customer) => {
+    setEditingCustomer(customer);
+    setShowForm(true);
+  };
+
+  const closeForm = () => {
+    setShowForm(false);
+    setEditingCustomer(null);
+  };
+
+  const saveCustomer = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSaving(true);
     setError("");
     const form = new FormData(event.currentTarget);
+    const payload = {
+      fullName: form.get("fullName"),
+      phone: form.get("phone"),
+      vehiclePlate: form.get("vehiclePlate"),
+      parkingSpot: form.get("parkingSpot"),
+      locationId: form.get("locationId") ? Number(form.get("locationId")) : null,
+      carTypeId: form.get("carTypeId") ? Number(form.get("carTypeId")) : null,
+      creditLimit: Number(form.get("creditLimit")),
+    };
+
     try {
-      await apiFetch("/customers", {
-        method: "POST",
-        body: JSON.stringify({
-          customerCode: form.get("customerCode"),
-          fullName: form.get("fullName"),
-          phone: form.get("phone"),
-          creditLimit: Number(form.get("creditLimit")),
-        }),
+      await apiFetch(editingCustomer ? `/customers/${editingCustomer.id}` : "/customers", {
+        method: editingCustomer ? "PATCH" : "POST",
+        body: JSON.stringify(payload),
       });
-      setShowForm(false);
+      closeForm();
       await loadCustomers();
     } catch (saveError) {
       setError(errorMessage(saveError));
@@ -85,8 +125,35 @@ export default function CustomersScreen() {
     }
   };
 
+  const removeCustomer = async (customer: Customer) => {
+    if (!window.confirm(`ปิดใช้งานลูกค้า ${customer.fullName} หรือไม่? ประวัติการขายเชื่อจะยังคงอยู่`)) return;
+    setDeletingId(customer.id);
+    setError("");
+    try {
+      await apiFetch(`/customers/${customer.id}`, { method: "DELETE" });
+      await loadCustomers();
+    } catch (removeError) {
+      setError(errorMessage(removeError));
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const exportCsv = () => {
-    const rows = [["รหัสลูกค้า", "ชื่อ", "โทรศัพท์", "ยอดซื้อสะสม", "วงเงินเครดิต", "ยอดค้างชำระ"], ...customers.map((customer) => [customer.customerCode, customer.fullName, customer.phone ?? "", customer.totalSpent, customer.creditLimit, customer.balanceDue])];
+    const rows = [
+      ["รหัสลูกค้า", "ชื่อ-นามสกุล", "โทรศัพท์", "ทะเบียนรถ", "จุดจอดรถ", "สถานที่", "ประเภทรถ", "วงเงินเครดิต", "ยอดค้างชำระ"],
+      ...customers.map((customer) => [
+        customer.customerCode,
+        customer.fullName,
+        customer.phone ?? "",
+        customer.vehiclePlate ?? "",
+        customer.parkingSpot ?? "",
+        customer.locationName ?? "",
+        customer.carTypeName ?? "",
+        customer.creditLimit,
+        customer.balanceDue,
+      ]),
+    ];
     const csv = rows.map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(",")).join("\n");
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" }));
     const link = document.createElement("a");
@@ -97,10 +164,43 @@ export default function CustomersScreen() {
   };
 
   return <AdminShell active="customers">
-    <PageTitle title="ระบบบัญชีขายเชื่อ" subtitle={`ข้อมูลอัปเดต: ${new Date().toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" })}`} />
+    <PageTitle
+      title="ระบบบัญชีขายเชื่อ"
+      subtitle={`ข้อมูลอัปเดต: ${new Date().toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" })}`}
+      action={<div className="product-page-actions"><button className="secondary-button" onClick={exportCsv} type="button"><Download size={16} /> ส่งออก CSV</button><button className="primary-button" onClick={openCreateForm} type="button"><UserPlus size={17} /> เพิ่มลูกค้า</button></div>}
+    />
+    <div className="stat-grid four">
+      <Stat label="ลูกค้าทั้งหมด" value={`${stats?.totalCustomers ?? 0} ราย`} />
+      <Stat label="ลูกค้าที่มีหนี้" value={`${stats?.customersWithDebt ?? 0} ราย`} tone="orange" />
+      <Stat label="ยอดค้างชำระรวม" value={`฿${money(stats?.totalBalanceDue ?? 0)}`} tone="neutral" />
+      <Stat label="ขายเชื่อเดือนนี้" value={`฿${money(stats?.creditSalesThisMonth ?? 0)}`} />
+    </div>
     {loading && <div className="api-message">กำลังโหลดข้อมูลลูกค้า...</div>}
     {error && <div className="api-message error">{error}</div>}
-    <section className="data-card credit-card"><div className="table-wrap"><table><thead><tr>{["ชื่อลูกค้า", "เบอร์โทรศัพท์", "สินค้าประจำ", "ยอดค้างชำระ", "สถานะ", "จัดการ"].map(title => <th key={title}>{title}</th>)}</tr></thead><tbody>{customers.filter(customer => customer.creditLimit > 0 || customer.balanceDue > 0).slice(0, 4).map(customer => { const isOver = customer.creditLimit > 0 && customer.balanceDue >= customer.creditLimit; const isDue = customer.balanceDue > customer.creditLimit * .6; return <tr key={customer.id}><td><strong>{customer.fullName}</strong></td><td>{customer.phone ?? "–"}</td><td><span className="soft-tag">{customer.favoriteProduct ?? "ไม่ระบุ"}</span></td><td className={isDue ? "danger-text" : ""}><strong>฿{customer.balanceDue.toLocaleString("th-TH", { minimumFractionDigits: 2 })}</strong></td><td><span className={`status-pill ${isOver ? "s-1" : isDue ? "s-3" : "s-0"}`}>{isOver ? "เกินกำหนด" : isDue ? "วงเงินเต็ม" : "ปกติ"}</span></td><td><div className="credit-actions"><button aria-label="ดูประวัติ"><RotateCcw size={19}/></button><button className="row-action">รับชำระ</button></div></td></tr>; })}</tbody></table></div><div className="recommendation-pagination"><span>แสดงผล 1-{Math.min(4, customers.length)} จากทั้งหมด {customers.length} รายการ</span><div><button><ChevronLeft size={17}/></button><button className="selected">1</button><button>2</button><button>3</button><button><ChevronRight size={17}/></button></div></div></section>
-    {showForm && <div className="modal-backdrop"><form className="modal" onSubmit={createCustomer}><button type="button" className="modal-close" onClick={() => setShowForm(false)}><X /></button><h2>เพิ่มลูกค้าใหม่</h2><label>รหัสลูกค้า<input name="customerCode" required placeholder="เช่น CUS-0001" /></label><label>ชื่อ-นามสกุล<input name="fullName" required /></label><label>เบอร์โทรศัพท์<input name="phone" type="tel" /></label><label>วงเงินเครดิต<input name="creditLimit" min="0" step="0.01" type="number" defaultValue="0" /></label><button className="primary-button" disabled={saving} type="submit">{saving ? "กำลังบันทึก..." : "บันทึกลูกค้า"}</button></form></div>}
+    <section className="data-card credit-card">
+      <div className="table-wrap"><table><thead><tr>{["ชื่อลูกค้า", "เบอร์โทรศัพท์", "ทะเบียนรถ", "จุดจอดรถ", "สถานที่", "ประเภทรถ", "วงเงินเครดิต", "ยอดค้างชำระ", "ระดับสมาชิก", "จัดการ"].map(title => <th key={title}>{title}</th>)}</tr></thead><tbody>
+        {customers.map((customer) => {
+          const creditLimit = Number(customer.creditLimit);
+          const balanceDue = Number(customer.balanceDue);
+          const isOver = creditLimit > 0 && balanceDue >= creditLimit;
+          const isDue = creditLimit > 0 && balanceDue > creditLimit * .6;
+          return <tr key={customer.id}>
+            <td><div className="person"><span>{customer.fullName.charAt(0)}</span><div><strong>{customer.fullName}</strong><small>{customer.customerCode}</small></div></div></td>
+            <td>{customer.phone ?? "–"}</td>
+            <td>{customer.vehiclePlate ?? "–"}</td>
+            <td>{customer.parkingSpot ?? "–"}</td>
+            <td>{customer.locationName ?? "–"}</td>
+            <td>{customer.carTypeName ?? "–"}</td>
+            <td>฿{money(creditLimit)}</td>
+            <td className={isDue ? "danger-text" : ""}><strong>฿{money(balanceDue)}</strong>{isOver && <small className="danger-text"> เกินวงเงิน</small>}</td>
+            <td><span className="soft-tag">{memberLevel(Number(customer.totalSpent))}</span></td>
+            <td><div className="customer-actions"><button aria-label={`แก้ไข ${customer.fullName}`} className="tiny-button" onClick={() => openEditForm(customer)} type="button"><Pencil size={14} /></button><button aria-label={`ลบ ${customer.fullName}`} className="tiny-button danger-button" disabled={deletingId === customer.id} onClick={() => void removeCustomer(customer)} type="button"><Trash2 size={14} /></button></div></td>
+          </tr>;
+        })}
+        {!loading && customers.length === 0 && <tr><td className="empty-cell" colSpan={10}>ยังไม่มีลูกค้าประจำในระบบ</td></tr>}
+      </tbody></table></div>
+      <div className="recommendation-pagination"><span>แสดงลูกค้าที่ใช้งานอยู่ทั้งหมด {customers.length} รายการ</span></div>
+    </section>
+    {showForm && <div className="modal-backdrop"><form key={editingCustomer?.id ?? "new"} className="modal customer-form-modal" onSubmit={saveCustomer}><button type="button" className="modal-close" onClick={closeForm}><X /></button><h2>{editingCustomer ? "แก้ไขข้อมูลลูกค้า" : "เพิ่มลูกค้าใหม่"}</h2><p className="modal-description">ข้อมูลจะถูกบันทึกให้ตรงกับตาราง Customers โดยตรง ส่วนยอดค้างชำระจะเกิดจากใบแจ้งหนี้ขายเชื่อเท่านั้น</p><div className="product-form-grid"><label className="wide">ชื่อ-นามสกุล<input defaultValue={editingCustomer?.fullName ?? ""} name="fullName" required /></label><label>เบอร์โทรศัพท์<input defaultValue={editingCustomer?.phone ?? ""} name="phone" type="tel" /></label><label>ทะเบียนรถ<input defaultValue={editingCustomer?.vehiclePlate ?? ""} name="vehiclePlate" /></label><label>จุดจอดรถ<input defaultValue={editingCustomer?.parkingSpot ?? ""} name="parkingSpot" /></label><label>สถานที่<select defaultValue={editingCustomer?.locationId ? String(editingCustomer.locationId) : ""} name="locationId"><option value="">ไม่ระบุ</option>{options.locations.map((option) => <option key={option.id} value={option.id}>{option.name ?? `#${option.id}`}</option>)}</select></label><label>ประเภทรถ<select defaultValue={editingCustomer?.carTypeId ? String(editingCustomer.carTypeId) : ""} name="carTypeId"><option value="">ไม่ระบุ</option>{options.carTypes.map((option) => <option key={option.id} value={option.id}>{option.name ?? `#${option.id}`}</option>)}</select></label><label>วงเงินเครดิต<input defaultValue={editingCustomer?.creditLimit ?? 0} min="0" name="creditLimit" step="0.01" type="number" /></label></div><div className="product-form-actions"><button onClick={closeForm} type="button">ยกเลิก</button><button className="primary-button" disabled={saving} type="submit">{saving ? "กำลังบันทึก..." : editingCustomer ? "บันทึกการแก้ไข" : "บันทึกลูกค้า"}</button></div></form></div>}
   </AdminShell>;
 }
