@@ -14,6 +14,7 @@ interface InventoryRow extends RowDataPacket {
   stockQuantity: number;
   lowStockThreshold: number;
   unit: string;
+  costPrice: number;
   price: number;
   stockValue: number;
   status: "out" | "low" | "normal";
@@ -155,24 +156,41 @@ inventoryRouter.post("/movements", asyncHandler(async (request, response) => {
 }));
 
 inventoryRouter.get("/", asyncHandler(async (request, response) => {
+  const search = typeof request.query.search === "string" ? request.query.search.trim() : "";
   const status = typeof request.query.status === "string" ? request.query.status : "";
-  const category = typeof request.query.category === "string" ? request.query.category.trim() : "";
+  const sortBy = typeof request.query.sortBy === "string" ? request.query.sortBy : "";
+
   const conditions = ["p.is_active = 1"];
   const values: Array<string | number> = [];
   const stockExpression = "COALESCE(stock.stockQuantity, 0)";
-  if (["out", "low", "normal"].includes(status)) {
-    conditions.push(status === "out"
-      ? `${stockExpression} <= 0`
-      : status === "low"
-        ? `${stockExpression} > 0 AND ${stockExpression} <= p.reorder_point`
-        : `${stockExpression} > p.reorder_point`);
-  }
-  if (category) {
-    conditions.push("(CAST(c.category_id AS CHAR) = ? OR c.category_name = ?)");
-    values.push(category, category);
+
+  // 1. ค้นหาชื่อสินค้า หรือ SKU
+  if (search) {
+    conditions.push("(p.product_name LIKE ? OR p.sku LIKE ?)");
+    values.push(`%${search}%`, `%${search}%`);
   }
 
-  const [items] = await pool.query<InventoryRow[]>(`
+  // 2. กรองตามสถานะ (Filter)
+  if (status === "out") {
+    conditions.push(`${stockExpression} <= 0`);
+  } else if (status === "low") {
+    conditions.push(`${stockExpression} > 0 AND ${stockExpression} <= p.reorder_point`);
+  } else if (status === "normal") {
+    conditions.push(`${stockExpression} > p.reorder_point`);
+  }
+
+  // 3. จัดเรียงข้อมูล (Sort)
+  let orderByClause = "CASE WHEN stock.minExpiryDate IS NULL THEN 1 ELSE 0 END, stock.minExpiryDate ASC, p.product_id DESC";
+
+  if (sortBy === "stockDesc") {
+    orderByClause = `${stockExpression} DESC, p.product_id DESC`;
+  } else if (sortBy === "stockAsc") {
+    orderByClause = `${stockExpression} ASC, p.product_id ASC`;
+  } else if (sortBy === "expiryAsc") {
+    orderByClause = "CASE WHEN stock.minExpiryDate IS NULL THEN 1 ELSE 0 END, stock.minExpiryDate ASC, p.product_id DESC";
+  }
+
+const [items] = await pool.query<InventoryRow[]>(`
     SELECT
       p.product_id AS id,
       p.sku,
@@ -182,10 +200,7 @@ inventoryRouter.get("/", asyncHandler(async (request, response) => {
       p.reorder_point AS lowStockThreshold,
       p.base_unit AS unit,
       COALESCE(pu.selling_price, 0) AS price,
-      ROUND(
-        ${stockExpression} * COALESCE(pu.selling_price / NULLIF(pu.conversion_factor, 0), 0),
-        2
-      ) AS stockValue,
+      ROUND(${stockExpression} * COALESCE(pu.selling_price / NULLIF(pu.conversion_factor, 0), 0), 2) AS stockValue,
       CASE
         WHEN ${stockExpression} <= 0 THEN 'out'
         WHEN ${stockExpression} <= p.reorder_point THEN 'low'
@@ -206,6 +221,7 @@ inventoryRouter.get("/", asyncHandler(async (request, response) => {
     LEFT JOIN (
       SELECT
         pb.product_id,
+        /* นับสต็อกเฉพาะ ACTIVE และ NEAR_EXPIRY */
         SUM(CASE WHEN pb.status IN ('ACTIVE', 'NEAR_EXPIRY') THEN pb.quantity_remaining_base ELSE 0 END) AS stockQuantity,
         SUBSTRING_INDEX(GROUP_CONCAT(
           CASE WHEN pb.status IN ('ACTIVE', 'NEAR_EXPIRY') AND pb.quantity_remaining_base > 0 THEN pb.lot_no END
@@ -215,19 +231,15 @@ inventoryRouter.get("/", asyncHandler(async (request, response) => {
         MIN(CASE WHEN pb.status IN ('ACTIVE', 'NEAR_EXPIRY') AND pb.quantity_remaining_base > 0 THEN pb.expiry_date END) AS expiryDate,
         MAX(sm.moved_at) AS updatedAt
       FROM product_batches pb
-      LEFT JOIN stock_movements sm ON sm.batch_id = pb.batch_id
       GROUP BY pb.product_id
     ) stock ON stock.product_id = p.product_id
     WHERE ${conditions.join(" AND ")}
-    ORDER BY FIELD(status, 'out', 'low', 'normal'), p.product_name ASC
+    ORDER BY ${orderByClause}
   `, values);
 
   const [statsRows] = await pool.query<InventoryStatsRow[]>(`
     SELECT
-      COALESCE(SUM(
-        COALESCE(stock.stockQuantity, 0)
-        * COALESCE(pu.selling_price / NULLIF(pu.conversion_factor, 0), 0)
-      ), 0) AS totalStockValue,
+      COALESCE(SUM(COALESCE(stock.stockQuantity, 0) * COALESCE(pu.selling_price / NULLIF(pu.conversion_factor, 0), 0)), 0) AS totalStockValue,
       COUNT(*) AS productCount,
       COALESCE(SUM(COALESCE(stock.stockQuantity, 0) > 0 AND COALESCE(stock.stockQuantity, 0) <= p.reorder_point), 0) AS lowStockCount,
       COALESCE(SUM(COALESCE(stock.stockQuantity, 0) <= 0), 0) AS outOfStockCount
@@ -247,5 +259,6 @@ inventoryRouter.get("/", asyncHandler(async (request, response) => {
     ) stock ON stock.product_id = p.product_id
     WHERE p.is_active = 1
   `);
+
   response.json({ success: true, data: { items, stats: statsRows[0] } });
 }));

@@ -5,6 +5,7 @@ import CustomersScreen from "../_screens/CustomersScreen";
 import DashboardScreen from "../_screens/DashboardScreen";
 import EmployeesScreen from "../_screens/EmployeesScreen";
 import HistoryScreen from "../_screens/HistoryScreen";
+import InvenHistoryScreen from "../_screens/InvenHistoryScreen";
 import InventoryScreen from "../_screens/InventoryScreen";
 import InventoryOrdersScreen from "../_screens/InventoryOrdersScreen";
 import LoginScreen from "../_screens/LoginScreen";

@@ -151,8 +151,8 @@ td { height: 61px; padding: 0 20px; text-align: center; border-top: 1px solid #e
 .dashboard-content { padding: 24px 32px 45px; }
 .active-setting { background: #eef5f1 !important; color: var(--green) !important; }
 .header-active { color: var(--green); border-bottom: 3px solid var(--green); border-radius: 0; }
-.stat-grid { display: grid; gap: 22px; margin-bottom: 24px; }.stat-grid.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.mini-stat { min-height: 166px; padding: 24px; border: 1px solid var(--border); background: #fff; border-radius: 11px; display: flex; flex-direction: column; justify-content: center; }
+.stat-grid { display: grid; gap: 22px; margin-bottom: 24px; }.stat-grid.four { grid-template-columns: repeat(4, minmax(0, 1fr)); } 
+.mini-stat { min-height: 166px; padding: 24px; border: 1px solid var(--border); background: #fff; border-radius: 11px; display: flex; flex-direction: column; justify-content: space-between; }
 .mini-stat span { color: var(--muted); font-size: 12px; }.mini-stat strong { margin-top: 14px; font-size: 31px; line-height: 1; }.mini-stat small { margin-top: 12px; color: var(--green); }
 .mini-stat.red strong, .mini-stat.red small { color: #c82027; }.mini-stat.orange strong, .mini-stat.orange small { color: #b44d00; }.mini-stat.neutral strong { color: #111; }
 .data-card { overflow: hidden; background: #fff; border: 1px solid var(--border); border-radius: 11px; margin-top: 20px; }
@@ -237,6 +237,9 @@ td { height: 61px; padding: 0 20px; text-align: center; border-top: 1px solid #e
 .section-inventory > .subpage-heading, .section-inventory > .stat-grid, .section-inventory > .data-card { width: 100%; max-width: 934px; }
 .section-inventory .subpage-heading .primary-button { min-width: 139px; min-height: 56px; }
 .section-inventory .stat-grid.four { grid-template-columns: repeat(4, minmax(0, 210px)); justify-content: space-between; gap: 0; }
+.section-inventory .mini-stat { position: relative; justify-content: flex-start; }
+.section-inventory .mini-stat strong { position: absolute; top: 50%; margin-top: 0; transform: translateY(-50%); }
+.section-inventory .mini-stat small { position: absolute; bottom: 24px; margin-top: 0; }
 .section-inventory .data-card { margin-top: 0; overflow: visible; border: 0; border-radius: 0; background: transparent; }
 .section-inventory .table-tools { min-height: 74px; border: 1px solid var(--border); border-radius: 11px; }
 .section-inventory .inventory-table { overflow: hidden; border: 1px solid var(--border); border-radius: 11px; background: #fff; margin-top: 17px; }
@@ -244,8 +247,8 @@ td { height: 61px; padding: 0 20px; text-align: center; border-top: 1px solid #e
 /* Pixel-matched screens from C:\Users\Administrator\Desktop\New folder */
 .section-inventory .inventory-stock-card { max-width: 934px; }
 .section-inventory .table-tools { padding: 15px 16px; background: #eef3ff; border: 0; }
-.section-inventory .table-tools select { width: 185px; }
-.section-inventory .inventory-table th { height: 81px; }
+.section-inventory .table-tools select { width: 225px; }
+.section-inventory .inventory-table th { height: 81px; font-size: 13px; }
 .section-inventory .inventory-table td { height: 69px; }
 .section-inventory .inventory-table .expired-row { color: #7f8984; background: #f1f2f1; }
 .section-inventory .more-cell { font-size: 24px; color: #707a75; }
