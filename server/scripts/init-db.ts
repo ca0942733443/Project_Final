@@ -52,18 +52,8 @@ async function initializeDatabase() {
     if (!(await columnExists(connection, "products", "image_public_id"))) {
       await connection.query("ALTER TABLE products ADD COLUMN image_public_id VARCHAR(255) NULL AFTER image_url");
     }
-    // Older installations created customers with the location/car-type foreign keys.
-    // Keep those columns for existing data, but add the current customer fields and
-    // make the legacy references optional so new customers use the current schema.
-    if (!(await columnExists(connection, "customers", "vehicle_plate"))) {
-      await connection.query("ALTER TABLE customers ADD COLUMN vehicle_plate VARCHAR(30) NULL AFTER phone");
-    }
-    if (!(await columnExists(connection, "customers", "parking_spot"))) {
-      await connection.query("ALTER TABLE customers ADD COLUMN parking_spot VARCHAR(100) NULL AFTER vehicle_plate");
-    }
-    if (await columnExists(connection, "customers", "location_location_id")) {
-      await connection.query("ALTER TABLE customers MODIFY COLUMN location_location_id INT NULL");
-    }
+    // Customers now follow the latest Workbench schema: car_plate and a required
+    // text location. Legacy customer columns are not added back automatically.
     if (await columnExists(connection, "customers", "car_type_car_type_id")) {
       await connection.query("ALTER TABLE customers MODIFY COLUMN car_type_car_type_id INT NULL");
     }
