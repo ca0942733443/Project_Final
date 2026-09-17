@@ -15,6 +15,7 @@ import { productsRouter } from "./routes/products";
 import { suppliersRouter } from "./routes/suppliers";
 import { ApiError } from "./utils/api-error";
 import { authRouter } from "./routes/auth";
+import { recommendationsRouter } from "./routes/recommendations";
 import { requireAuthentication } from "./middleware/auth";
 
 export const app = express();
@@ -42,6 +43,7 @@ app.use("/api/employees", employeesRouter);
 app.use("/api/inventory", inventoryRouter);
 app.use("/api/inventory-orders", inventoryOrdersRouter);
 app.use("/api/products", productsRouter);
+app.use("/api/recommendations", recommendationsRouter);
 app.use("/api/suppliers", suppliersRouter);
 app.use("/api/orders", ordersRouter);
 

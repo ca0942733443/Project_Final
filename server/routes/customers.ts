@@ -9,10 +9,8 @@ interface CustomerRow extends RowDataPacket {
   customerCode: string;
   fullName: string;
   phone: string | null;
-  vehiclePlate: string | null;
-  parkingSpot: string | null;
-  locationId: number | null;
-  locationName: string | null;
+  carPlate: string | null;
+  location: string;
   carTypeId: number | null;
   carTypeName: string | null;
   creditLimit: number;
@@ -39,9 +37,8 @@ interface CustomerStatsRow extends RowDataPacket {
 type CustomerInput = {
   fullName?: unknown;
   phone?: unknown;
-  vehiclePlate?: unknown;
-  parkingSpot?: unknown;
-  locationId?: unknown;
+  carPlate?: unknown;
+  location?: unknown;
   carTypeId?: unknown;
   creditLimit?: unknown;
   balanceDue?: unknown;
@@ -80,35 +77,23 @@ function optionalId(value: unknown, fieldName: string) {
   return positiveId(value, fieldName);
 }
 
-async function ensureLookupExists(
-  tableName: "location" | "car_type",
-  columnName: "location_id" | "car_type_id",
-  id: number | null,
-  fieldName: string,
-) {
+async function ensureCarTypeExists(id: number | null) {
   if (id === null) return;
   const [rows] = await pool.query<Array<RowDataPacket & { found: number }>>(
-    `SELECT 1 AS found FROM ${tableName} WHERE ${columnName} = ? LIMIT 1`,
+    "SELECT 1 AS found FROM car_type WHERE car_type_id = ? LIMIT 1",
     [id],
   );
-  if (!rows[0]) throw new ApiError(404, `ไม่พบ${fieldName}`);
+  if (!rows[0]) throw new ApiError(404, "ไม่พบประเภทรถ");
 }
 
 customersRouter.get("/options", asyncHandler(async (_request, response) => {
-  const [locations, carTypes] = await Promise.all([
-    pool.query<CustomerOptionRow[]>(`
-      SELECT location_id AS id, location_name AS name
-      FROM location
-      ORDER BY location_name ASC, location_id ASC
-    `),
-    pool.query<CustomerOptionRow[]>(`
-      SELECT car_type_id AS id, ca_rtype_name AS name
-      FROM car_type
-      ORDER BY ca_rtype_name ASC, car_type_id ASC
-    `),
-  ]);
+  const [carTypes] = await pool.query<CustomerOptionRow[]>(`
+    SELECT car_type_id AS id, ca_rtype_name AS name
+    FROM car_type
+    ORDER BY ca_rtype_name ASC, car_type_id ASC
+  `);
 
-  response.json({ success: true, data: { locations: locations[0], carTypes: carTypes[0] } });
+  response.json({ success: true, data: { carTypes } });
 }));
 
 customersRouter.get("/stats", asyncHandler(async (_request, response) => {
@@ -141,9 +126,9 @@ customersRouter.get("/", asyncHandler(async (request, response) => {
   const search = typeof request.query.search === "string" ? request.query.search.trim() : "";
   const values: string[] = [];
   const searchCondition = search
-    ? "AND (c.full_name LIKE ? OR CONCAT('CUS-', LPAD(c.customer_id, 4, '0')) LIKE ? OR c.phone LIKE ? OR c.vehicle_plate LIKE ? OR c.parking_spot LIKE ? OR l.location_name LIKE ? OR ct.ca_rtype_name LIKE ?)"
+    ? "AND (c.full_name LIKE ? OR CONCAT('CUS-', LPAD(c.customer_id, 4, '0')) LIKE ? OR c.phone LIKE ? OR c.car_plate LIKE ? OR c.location LIKE ? OR ct.ca_rtype_name LIKE ?)"
     : "";
-  if (search) values.push(...Array.from({ length: 7 }, () => `%${search}%`));
+  if (search) values.push(...Array.from({ length: 6 }, () => `%${search}%`));
 
   const [customers] = await pool.query<CustomerRow[]>(`
     SELECT
@@ -151,10 +136,8 @@ customersRouter.get("/", asyncHandler(async (request, response) => {
       CONCAT('CUS-', LPAD(c.customer_id, 4, '0')) AS customerCode,
       c.full_name AS fullName,
       c.phone,
-      c.vehicle_plate AS vehiclePlate,
-      c.parking_spot AS parkingSpot,
-      c.location_location_id AS locationId,
-      l.location_name AS locationName,
+      c.car_plate AS carPlate,
+      c.location,
       c.car_type_car_type_id AS carTypeId,
       ct.ca_rtype_name AS carTypeName,
       c.credit_limit AS creditLimit,
@@ -175,7 +158,6 @@ customersRouter.get("/", asyncHandler(async (request, response) => {
         LIMIT 1
       ) AS favoriteProduct
     FROM customers c
-    LEFT JOIN location l ON l.location_id = c.location_location_id
     LEFT JOIN car_type ct ON ct.car_type_id = c.car_type_car_type_id
     LEFT JOIN (
       SELECT
@@ -204,9 +186,8 @@ customersRouter.post("/", asyncHandler(async (request, response) => {
   const body = request.body as CustomerInput;
   const fullName = requiredText(body.fullName, "ชื่อลูกค้า");
   const phone = optionalText(body.phone);
-  const vehiclePlate = optionalText(body.vehiclePlate);
-  const parkingSpot = optionalText(body.parkingSpot);
-  const locationId = optionalId(body.locationId, "รหัสสถานที่");
+  const carPlate = optionalText(body.carPlate);
+  const location = requiredText(body.location, "สถานที่");
   const carTypeId = optionalId(body.carTypeId, "รหัสประเภทรถ");
   const creditLimit = nonNegativeNumber(body.creditLimit, "วงเงินเครดิต", 0);
   const balanceDue = nonNegativeNumber(body.balanceDue, "ยอดค้างชำระ", 0);
@@ -214,18 +195,15 @@ customersRouter.post("/", asyncHandler(async (request, response) => {
     throw new ApiError(400, "ยอดค้างชำระต้องเกิดจากใบแจ้งหนี้ขายเชื่อ ไม่สามารถกำหนดตอนสร้างลูกค้าได้");
   }
 
-  await Promise.all([
-    ensureLookupExists("location", "location_id", locationId, "สถานที่"),
-    ensureLookupExists("car_type", "car_type_id", carTypeId, "ประเภทรถ"),
-  ]);
+  await ensureCarTypeExists(carTypeId);
 
   const [result] = await pool.execute<ResultSetHeader>(`
     INSERT INTO customers (
-      full_name, phone, vehicle_plate, parking_spot,
-      location_location_id, car_type_car_type_id, credit_limit, is_active
+      full_name, phone, car_plate, credit_limit, is_active,
+      car_type_car_type_id, location
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, 1)
-  `, [fullName, phone, vehiclePlate, parkingSpot, locationId, carTypeId, creditLimit]);
+    VALUES (?, ?, ?, ?, 1, ?, ?)
+  `, [fullName, phone, carPlate, creditLimit, carTypeId, location]);
   response.status(201).json({
     success: true,
     data: { id: result.insertId, customerCode: `CUS-${String(result.insertId).padStart(4, "0")}` },
@@ -244,16 +222,11 @@ customersRouter.patch("/:id", asyncHandler(async (request, response) => {
 
   if (body.fullName !== undefined) setValue("full_name", requiredText(body.fullName, "ชื่อลูกค้า"));
   if (body.phone !== undefined) setValue("phone", optionalText(body.phone));
-  if (body.vehiclePlate !== undefined) setValue("vehicle_plate", optionalText(body.vehiclePlate));
-  if (body.parkingSpot !== undefined) setValue("parking_spot", optionalText(body.parkingSpot));
-  if (body.locationId !== undefined) {
-    const locationId = optionalId(body.locationId, "รหัสสถานที่");
-    await ensureLookupExists("location", "location_id", locationId, "สถานที่");
-    setValue("location_location_id", locationId);
-  }
+  if (body.carPlate !== undefined) setValue("car_plate", optionalText(body.carPlate));
+  if (body.location !== undefined) setValue("location", requiredText(body.location, "สถานที่"));
   if (body.carTypeId !== undefined) {
     const carTypeId = optionalId(body.carTypeId, "รหัสประเภทรถ");
-    await ensureLookupExists("car_type", "car_type_id", carTypeId, "ประเภทรถ");
+    await ensureCarTypeExists(carTypeId);
     setValue("car_type_car_type_id", carTypeId);
   }
   if (body.creditLimit !== undefined) setValue("credit_limit", nonNegativeNumber(body.creditLimit, "วงเงินเครดิต"));

@@ -122,8 +122,8 @@ async function run() {
       body: JSON.stringify({ email: "captain@gmail.com", password: "captain123" }),
     });
     const token = login.token;
-    const customerOptions = await api<{ locations: Array<{ id: number }>; carTypes: Array<{ id: number }> }>("/customers/options", token);
-    if (!Array.isArray(customerOptions.locations) || !Array.isArray(customerOptions.carTypes)) throw new Error("Customer options response is invalid");
+    const customerOptions = await api<{ carTypes: Array<{ id: number }> }>("/customers/options", token);
+    if (!Array.isArray(customerOptions.carTypes)) throw new Error("Customer options response is invalid");
 
     const supplier = await api<{ id: number }>("/suppliers", token, {
       method: "POST",
@@ -152,17 +152,22 @@ async function run() {
       body: JSON.stringify({
         fullName: "Route Test Customer",
         phone,
-        vehiclePlate: "กก-1234",
-        parkingSpot: "A-01",
-        ...(customerOptions.locations[0] ? { locationId: customerOptions.locations[0].id } : {}),
+        carPlate: "กก-1234",
+        location: "หน้าร้าน",
         ...(customerOptions.carTypes[0] ? { carTypeId: customerOptions.carTypes[0].id } : {}),
         creditLimit: 1000,
       }),
     });
     await api(`/customers/${customer.id}`, token, {
       method: "PATCH",
-      body: JSON.stringify({ fullName: "Route Test Customer Updated", vehiclePlate: "กก-5678", creditLimit: 1200 }),
+      body: JSON.stringify({ fullName: "Route Test Customer Updated", carPlate: "กก-5678", location: "จุดรับสินค้า", creditLimit: 1200 }),
     });
+    for (const query of ["Route Test Customer Updated", phone, "กก-5678"]) {
+      const matchingCustomers = await api<Array<{ id: number }>>(`/customers?search=${encodeURIComponent(query)}`, token);
+      if (!matchingCustomers.some((row) => row.id === customer.id)) {
+        throw new Error(`Customer search did not find the test customer by: ${query}`);
+      }
+    }
 
     const product = await api<{ id: number }>("/products", token, {
       method: "POST",
@@ -217,6 +222,7 @@ async function run() {
     await api("/orders?paymentMethod=qr", token);
     await api("/orders?paymentMethod=credit", token);
     await api("/dashboard?period=day", token);
+    await api("/recommendations?inactivityDays=3", token);
     await api("/inventory", token);
     await api("/inventory/movements", token);
     await api("/customers", token);
@@ -238,7 +244,7 @@ async function run() {
         "inventory GET/POST",
         "inventory-orders GET/POST/PATCH/detail",
         "orders cash/qr/credit POST/GET",
-        "dashboard/categories read routes",
+        "dashboard/recommendations/categories read routes",
       ],
     }));
   } finally {

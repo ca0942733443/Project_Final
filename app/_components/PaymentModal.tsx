@@ -1,9 +1,10 @@
 "use client";
 
-import { ArrowLeft, Banknote, CheckCircle2, CirclePlus, Delete, Info, QrCode, X } from "lucide-react";
+import { ArrowLeft, Banknote, CheckCircle2, CirclePlus, Delete, Info, QrCode, Search, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { buildPromptPayPayload, defaultPaymentSettings, loadPaymentSettings, PAYMENT_SETTINGS_CHANGED_EVENT, PaymentSettings } from "../_lib/payment";
+import { apiFetch, errorMessage } from "../_lib/api";
 
 type PaymentMethod = "cash" | "qr";
 
@@ -11,7 +12,15 @@ type PaymentModalProps = {
   orderNumber: string;
   total: number;
   onClose: () => void;
-  onConfirm: (method: PaymentMethod, amountReceived: number) => Promise<void>;
+  onConfirm: (method: PaymentMethod, amountReceived: number, customerId: number | null) => Promise<void>;
+};
+
+type CustomerSearchResult = {
+  id: number;
+  customerCode: string;
+  fullName: string;
+  phone: string | null;
+  carPlate: string | null;
 };
 
 const cashPresets = [100, 500, 1000];
@@ -25,6 +34,11 @@ export default function PaymentModal({ orderNumber, total, onClose, onConfirm }:
   const [paymentSettings, setPaymentSettings] = useState<PaymentSettings>(defaultPaymentSettings);
   const [qrDataUrl, setQrDataUrl] = useState("");
   const [qrError, setQrError] = useState("");
+  const [customerQuery, setCustomerQuery] = useState("");
+  const [customerResults, setCustomerResults] = useState<CustomerSearchResult[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerSearchResult | null>(null);
+  const [customerLoading, setCustomerLoading] = useState(false);
+  const [customerSearchError, setCustomerSearchError] = useState("");
   const received = Number(receivedText) || 0;
   const change = Math.max(0, received - total);
   const canConfirm = method === "cash" ? received >= total : paymentSettings.promptPayEnabled && Boolean(qrDataUrl);
@@ -76,6 +90,40 @@ export default function PaymentModal({ orderNumber, total, onClose, onConfirm }:
     return () => { cancelled = true; };
   }, [method, paymentSettings, total]);
 
+  useEffect(() => {
+    const query = customerQuery.trim();
+    if (!query) {
+      setCustomerResults([]);
+      setCustomerLoading(false);
+      setCustomerSearchError("");
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      setCustomerLoading(true);
+      setCustomerSearchError("");
+      void apiFetch<CustomerSearchResult[]>(`/customers?search=${encodeURIComponent(query)}`)
+        .then((rows) => {
+          if (!cancelled) setCustomerResults(rows.slice(0, 8));
+        })
+        .catch((searchError) => {
+          if (!cancelled) {
+            setCustomerResults([]);
+            setCustomerSearchError(errorMessage(searchError));
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setCustomerLoading(false);
+        });
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [customerQuery]);
+
   const enterAmount = (value: string) => {
     if (value === "delete") {
       setReceivedText((current) => current.length > 1 ? current.slice(0, -1) : "0");
@@ -93,7 +141,7 @@ export default function PaymentModal({ orderNumber, total, onClose, onConfirm }:
     setSubmitting(true);
     setError("");
     try {
-      await onConfirm(method, method === "cash" ? received : total);
+      await onConfirm(method, method === "cash" ? received : total, selectedCustomer?.id ?? null);
     } catch (confirmError) {
       setError(confirmError instanceof Error ? confirmError.message : "ชำระเงินไม่สำเร็จ");
       setSubmitting(false);
@@ -132,7 +180,51 @@ export default function PaymentModal({ orderNumber, total, onClose, onConfirm }:
               </button>
             </div>
 
-            {method === "cash" ? <input className="payment-member-search" placeholder="ค้นหาเบอร์สมาชิก" /> : <div className="payment-info"><Info size={18} /><span>สแกน QR PromptPay เพื่อชำระเงิน</span></div>}
+            <div className="payment-customer-search">
+              <label className="payment-customer-label" htmlFor="payment-customer-query">ลูกค้า (ไม่บังคับ)</label>
+              {selectedCustomer ? (
+                <div className="payment-customer-selected">
+                  <div>
+                    <strong>{selectedCustomer.fullName}</strong>
+                    <small>{[selectedCustomer.phone, selectedCustomer.carPlate].filter(Boolean).join(" · ") || selectedCustomer.customerCode}</small>
+                  </div>
+                  <button type="button" onClick={() => setSelectedCustomer(null)}>เปลี่ยน</button>
+                </div>
+              ) : (
+                <div className="payment-customer-input-wrap">
+                  <Search size={18} aria-hidden="true" />
+                  <input
+                    id="payment-customer-query"
+                    className="payment-member-search"
+                    value={customerQuery}
+                    onChange={(event) => setCustomerQuery(event.target.value)}
+                    placeholder="ค้นหาชื่อ เบอร์โทร หรือทะเบียนรถ"
+                    autoComplete="off"
+                  />
+                  {(customerLoading || customerSearchError || customerResults.length > 0) && <div className="payment-customer-results" role="listbox">
+                    {customerLoading && <div className="payment-customer-empty">กำลังค้นหาลูกค้า...</div>}
+                    {!customerLoading && customerSearchError && <div className="payment-customer-empty error">{customerSearchError}</div>}
+                    {!customerLoading && !customerSearchError && customerResults.map((customer) => (
+                      <button
+                        key={customer.id}
+                        type="button"
+                        role="option"
+                        onClick={() => {
+                          setSelectedCustomer(customer);
+                          setCustomerQuery("");
+                          setCustomerResults([]);
+                        }}
+                      >
+                        <strong>{customer.fullName}</strong>
+                        <small>{[customer.phone, customer.carPlate].filter(Boolean).join(" · ") || customer.customerCode}</small>
+                      </button>
+                    ))}
+                    {!customerLoading && !customerSearchError && customerQuery.trim() && customerResults.length === 0 && <div className="payment-customer-empty">ไม่พบลูกค้าที่ตรงกับคำค้น</div>}
+                  </div>}
+                </div>
+              )}
+            </div>
+            {method === "qr" && <div className="payment-info"><Info size={18} /><span>สแกน QR PromptPay เพื่อชำระเงิน</span></div>}
           </div>
 
           <div className="payment-modal-right">

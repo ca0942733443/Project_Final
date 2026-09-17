@@ -49,7 +49,7 @@ export default function PosScreen() {
       .finally(() => setLoading(false));
   }, []);
 
-  const createOrder = async (method: "cash" | "qr", amountReceived: number) => {
+  const createOrder = async (method: "cash" | "qr", amountReceived: number, customerId: number | null) => {
     const receiptItems = Object.entries(cart).filter(([, quantity]) => quantity > 0).map(([productId, quantity]) => {
       const product = productById.get(Number(productId));
       return { productName: product?.name ?? "สินค้า", quantity, lineTotal: (product?.price ?? 0) * quantity };
@@ -59,6 +59,7 @@ export default function PosScreen() {
       body: JSON.stringify({
         paymentMethod: method,
         amountReceived,
+        customerId,
         items: Object.entries(cart)
           .filter(([, quantity]) => quantity > 0)
           .map(([productId, quantity]) => ({ productId: Number(productId), quantity })),
