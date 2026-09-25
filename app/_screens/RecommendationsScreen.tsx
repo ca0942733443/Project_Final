@@ -1,6 +1,7 @@
 "use client";
 
 import { Check, Download, PackagePlus, RefreshCw } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import AdminShell from "../_components/AdminShell";
 import { PageTitle } from "../_components/PageElements";
@@ -10,6 +11,8 @@ type SalesRecommendation = {
   productId: number;
   productName: string;
   categoryName: string;
+  supplierId: number | null;
+  supplierName: string | null;
   unit: string;
   weeklySalesQuantity: number;
   weeklyRevenue: number;
@@ -47,6 +50,10 @@ type RecommendationData = {
   customers: CustomerRecommendation[];
 };
 
+type HeldOrderQuantities = Record<number, number>;
+
+const recommendationOrderDraftKey = "recommendation-order-draft";
+
 function numberText(value: number) {
   return Number(value ?? 0).toLocaleString("th-TH", { maximumFractionDigits: 3 });
 }
@@ -69,9 +76,9 @@ export default function RecommendationsScreen() {
   const [tab, setTab] = useState<"sales" | "customers">("sales");
   const [inactivityDays, setInactivityDays] = useState(3);
   const [recommendations, setRecommendations] = useState<RecommendationData | null>(null);
-  const [orderedProductIds, setOrderedProductIds] = useState<number[]>([]);
+  const [heldOrderQuantities, setHeldOrderQuantities] = useState<HeldOrderQuantities>({});
+  const [draftLoaded, setDraftLoaded] = useState(false);
   const [preparedCustomerIds, setPreparedCustomerIds] = useState<number[]>([]);
-  const [orderingProductId, setOrderingProductId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -90,32 +97,72 @@ export default function RecommendationsScreen() {
 
   useEffect(() => { void loadRecommendations(); }, [inactivityDays]);
 
-  const addToInventoryOrder = async (item: SalesRecommendation) => {
-    if (item.suggestedQuantity <= 0 || orderingProductId !== null) return;
-    setOrderingProductId(item.productId);
-    setError("");
+  useEffect(() => {
     try {
-      await apiFetch("/inventory-orders", {
-        method: "POST",
-        body: JSON.stringify({
-          note: `สร้างจากยอดขายย้อนหลัง ${recommendations?.salesWindowDays ?? 7} วัน`,
-          items: [{ productId: item.productId, quantity: item.suggestedQuantity }],
-        }),
-      });
-      setOrderedProductIds((current) => [...current, item.productId]);
-    } catch (orderError) {
-      setError(errorMessage(orderError));
+      const savedDraft = window.sessionStorage.getItem(recommendationOrderDraftKey);
+      if (savedDraft) {
+        const parsedDraft = JSON.parse(savedDraft) as Record<string, unknown>;
+        const validDraft: HeldOrderQuantities = {};
+        Object.entries(parsedDraft).forEach(([productIdText, quantityValue]) => {
+          const productId = Number(productIdText);
+          const quantity = Number(quantityValue);
+          if (Number.isInteger(productId) && productId > 0 && quantity > 0) validDraft[productId] = quantity;
+        });
+        setHeldOrderQuantities(validDraft);
+      }
+    } catch {
+      window.sessionStorage.removeItem(recommendationOrderDraftKey);
     } finally {
-      setOrderingProductId(null);
+      setDraftLoaded(true);
     }
+  }, []);
+
+  useEffect(() => {
+    if (!draftLoaded) return;
+    if (Object.keys(heldOrderQuantities).length > 0) {
+      window.sessionStorage.setItem(recommendationOrderDraftKey, JSON.stringify(heldOrderQuantities));
+    } else {
+      window.sessionStorage.removeItem(recommendationOrderDraftKey);
+    }
+  }, [draftLoaded, heldOrderQuantities]);
+
+  const sales = recommendations?.sales ?? [];
+  const customers = recommendations?.customers ?? [];
+  const heldOrderItems = Object.entries(heldOrderQuantities)
+    .map(([productId, quantity]) => ({ productId: Number(productId), quantity: Number(quantity) }))
+    .filter((item) => Number.isInteger(item.productId) && item.productId > 0 && item.quantity > 0);
+  const heldOrderTotalQuantity = heldOrderItems.reduce((total, item) => total + item.quantity, 0);
+  const heldSupplierGroups = Array.from(heldOrderItems.reduce((groups, item) => {
+    const product = sales.find((sale) => sale.productId === item.productId);
+    const supplierKey = product?.supplierId === null || product?.supplierId === undefined ? "general" : String(product.supplierId);
+    const current = groups.get(supplierKey) ?? {
+      supplierName: product?.supplierName ?? "ผู้จำหน่ายทั่วไป",
+      itemCount: 0,
+      quantity: 0,
+    };
+    current.itemCount += 1;
+    current.quantity += item.quantity;
+    groups.set(supplierKey, current);
+    return groups;
+  }, new Map<string, { supplierName: string; itemCount: number; quantity: number }>()).values());
+
+  const toggleHeldOrderItem = (item: SalesRecommendation) => {
+    if (item.suggestedQuantity <= 0) return;
+    setError("");
+    setHeldOrderQuantities((current) => {
+      const next = { ...current };
+      if (next[item.productId]) delete next[item.productId];
+      else next[item.productId] = item.suggestedQuantity;
+      return next;
+    });
   };
 
   const exportCsv = () => {
     if (!recommendations) return;
     const rows = tab === "sales"
       ? [
-        ["สินค้า", "หมวดหมู่", "ยอดขาย 7 วัน", "สต็อกปัจจุบัน", "เป้าสต็อก", "แนะนำเติม"],
-        ...recommendations.sales.map((item) => [item.productName, item.categoryName, item.weeklySalesQuantity, item.currentStock, item.targetStock, item.suggestedQuantity]),
+        ["สินค้า", "หมวดหมู่", "Supplier", "ยอดขาย 7 วัน", "สต็อกปัจจุบัน", "เป้าสต็อก", "แนะนำเติม"],
+        ...recommendations.sales.map((item) => [item.productName, item.categoryName, item.supplierName ?? "ผู้จำหน่ายทั่วไป", item.weeklySalesQuantity, item.currentStock, item.targetStock, item.suggestedQuantity]),
       ]
       : [
         ["ลูกค้า", "วันที่ซื้อครั้งล่าสุด", "หายไป (วัน)", "สินค้าที่ซื้อประจำ", "เบอร์โทรศัพท์", "ทะเบียนรถ"],
@@ -129,9 +176,6 @@ export default function RecommendationsScreen() {
     link.click();
     URL.revokeObjectURL(url);
   };
-
-  const sales = recommendations?.sales ?? [];
-  const customers = recommendations?.customers ?? [];
 
   return <AdminShell active="recommendations">
     <PageTitle
@@ -159,21 +203,27 @@ export default function RecommendationsScreen() {
         <button onClick={exportCsv} type="button"><Download size={16} /> ส่งออก</button>
         <button aria-label="รีเฟรชคำแนะนำ" onClick={() => void loadRecommendations()} type="button"><RefreshCw size={16} /></button>
       </div>
-      {tab === "sales" ? <div className="table-wrap"><table><thead><tr>{["สินค้า", "หมวดหมู่", "ขายได้ใน 7 วัน", "สต็อกคงเหลือ", "เป้าสต็อก", "ปริมาณที่แนะนำ", "จัดการ"].map((title) => <th key={title}>{title}</th>)}</tr></thead><tbody>
+      {tab === "sales" && heldOrderItems.length > 0 && <div className="recommendation-hold-bar">
+        <span><strong>พักรายการไว้แล้ว {heldOrderItems.length} รายการ จาก {heldSupplierGroups.length} Supplier</strong><small>{heldSupplierGroups.map((group) => `${group.supplierName} (${group.itemCount} รายการ)`).join(" • ")} · รวม {numberText(heldOrderTotalQuantity)} หน่วย — ยังไม่สร้างใบสั่งซื้อจริง</small></span>
+        <button className="recommendation-clear-button" onClick={() => setHeldOrderQuantities({})} type="button">ล้างรายการพัก</button>
+        <Link className="recommendation-confirm-button" href="/inventory-order-create">ตรวจสอบและสร้างใบสั่งซื้อ</Link>
+      </div>}
+      {tab === "sales" ? <div className="table-wrap"><table><thead><tr>{["สินค้า", "หมวดหมู่", "Supplier", "ขายได้ใน 7 วัน", "สต็อกคงเหลือ", "เป้าสต็อก", "ปริมาณที่แนะนำ", "จัดการ"].map((title) => <th key={title}>{title}</th>)}</tr></thead><tbody>
         {sales.map((item) => {
           const stockRatio = item.targetStock > 0 ? Math.min(100, item.currentStock / item.targetStock * 100) : 100;
-          const isOrdered = orderedProductIds.includes(item.productId);
+          const isHeld = Number(heldOrderQuantities[item.productId] ?? 0) > 0;
           return <tr key={item.productId}>
             <td><strong>{item.productName}</strong><small className="table-subtext">หน่วย: {item.unit}</small></td>
             <td>{item.categoryName}</td>
+            <td>{item.supplierName ?? "ผู้จำหน่ายทั่วไป"}</td>
             <td><strong>{numberText(item.weeklySalesQuantity)} {item.unit}</strong><small className="table-subtext">฿{money(item.weeklyRevenue)}</small></td>
             <td><div className="stock-level"><span>{numberText(item.currentStock)} {item.unit}</span><b>{Math.round(stockRatio)}%</b><i><em style={{ width: `${stockRatio}%` }} /></i></div></td>
             <td>{numberText(item.targetStock)} {item.unit}</td>
             <td className="suggested-qty">{item.suggestedQuantity > 0 ? `+ ${numberText(item.suggestedQuantity)} ${item.unit}` : "ไม่ต้องเติม"}</td>
-            <td><button className="row-action" disabled={isOrdered || item.suggestedQuantity <= 0 || orderingProductId !== null} onClick={() => void addToInventoryOrder(item)} type="button">{isOrdered ? <><Check size={14} /> เพิ่มแล้ว</> : orderingProductId === item.productId ? "กำลังบันทึก..." : <><PackagePlus size={14} /> สร้างรายการสั่งซื้อ</>}</button></td>
+            <td><button className="row-action" disabled={item.suggestedQuantity <= 0} onClick={() => toggleHeldOrderItem(item)} type="button">{isHeld ? <><Check size={14} /> พักไว้แล้ว</> : <><PackagePlus size={14} /> พักรายการ</>}</button></td>
           </tr>;
         })}
-        {!loading && sales.length === 0 && <tr><td className="empty-cell" colSpan={7}>ยังไม่มียอดขายในช่วง 7 วันล่าสุด หรือไม่มีสินค้าที่ถึงจุดสั่งซื้อ</td></tr>}
+        {!loading && sales.length === 0 && <tr><td className="empty-cell" colSpan={8}>ยังไม่มียอดขายในช่วง 7 วันล่าสุด หรือไม่มีสินค้าที่ถึงจุดสั่งซื้อ</td></tr>}
       </tbody></table></div> : <div className="table-wrap"><table><thead><tr>{["ลูกค้า", "ซื้อครั้งล่าสุด", "หายไป", "สินค้าที่ลูกค้าเคยซื้อ", "เบอร์", "ทะเบียนรถ", "จัดการ"].map((title) => <th key={title}>{title}</th>)}</tr></thead><tbody>
         {customers.map((customer) => {
           const isPrepared = preparedCustomerIds.includes(customer.customerId);
