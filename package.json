@@ -10,6 +10,8 @@
     "start": "next start",
     "start:server": "node dist/server/index.js",
     "db:init": "npm run build:server && node dist/server/scripts/init-db.js",
+    "db:seed:recommendations": "npm run build:server && node dist/server/scripts/seed-recommendations.js",
+    "db:simulate:inactive-customer": "npm run build:server && node dist/server/scripts/simulate-inactive-customer.js",
     "test:routes": "npm run build:server && node dist/server/scripts/route-smoke-test.js",
     "lint": "tsc --noEmit && tsc -p tsconfig.server.json --noEmit"
   },
