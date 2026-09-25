@@ -11,11 +11,11 @@
 }
 
 html.dark-mode {
-  --ink: #edf7f1;
-  --muted: #b7c9bf;
+  --ink: #ffffff;
+  --muted: #ffffff;
   --border: #52675c;
-  --background: #202d27;
-  --surface: #2b3a33;
+  --background: #000000;
+  --surface: #000000;
   color-scheme: dark;
 }
 
@@ -318,7 +318,7 @@ html.dark-mode body, html.dark-mode .app-shell { color: var(--ink); background: 
 html.dark-mode .sidebar, html.dark-mode .topbar, html.dark-mode .data-card, html.dark-mode .panel, html.dark-mode .mini-stat, html.dark-mode .setting-card, html.dark-mode .cart-panel, html.dark-mode .notification-drawer, html.dark-mode .receipt-modal { color: var(--ink); background: var(--surface); border-color: var(--border); }
 html.dark-mode .sidebar nav button:hover, html.dark-mode .sidebar nav a:hover, html.dark-mode .settings:hover, html.dark-mode .icon-button:hover { background: #35473f; }
 html.dark-mode .sidebar nav button.active, html.dark-mode .sidebar nav a.active { color: var(--ink); background: #3a4d44; }
-html.dark-mode .active-setting { color: #9ae5bd !important; background: #354a40 !important; }
+html.dark-mode .active-setting { color: #9ae5bd !important; background: #000000 !important; }
 html.dark-mode .topbar { border-bottom-color: var(--border); }
 html.dark-mode .search, html.dark-mode .filter-bar, html.dark-mode .table-tools, html.dark-mode .pagination, html.dark-mode th { color: var(--ink); background: #31433b; }
 html.dark-mode input, html.dark-mode textarea, html.dark-mode select { color: var(--ink); border-color: var(--border); background: #384b42; color-scheme: dark; }
@@ -361,13 +361,13 @@ html.dark-mode .preview-dark input, html.dark-mode .preview-dark textarea { colo
 html.dark-mode {
   --green: #45d49a;
   --green-dark: #2db77f;
-  --surface-raised: #34463d;
-  --surface-soft: #31443b;
-  --surface-input: #3d5147;
-  --surface-deep: #25342d;
+  --surface-raised: #000000;
+  --surface-soft: #000000;
+  --surface-input: #000000;
+  --surface-deep: #000000;
   --action: #16845e;
   --action-hover: #1b9a6e;
-  --on-action: #f2fff8;
+  --on-action: #ffffff;
 }
 
 html.dark-mode body, html.dark-mode .app-shell { color: var(--ink); background: var(--background); }
@@ -376,7 +376,7 @@ html.dark-mode .sidebar { border-right-color: var(--border); }
 html.dark-mode .topbar, html.dark-mode .panel-title, html.dark-mode .card-heading, html.dark-mode .cart-head, html.dark-mode .payment-modal-header, html.dark-mode .notification-drawer-header { border-color: var(--border); }
 html.dark-mode .sidebar nav button:hover, html.dark-mode .sidebar nav a:hover, html.dark-mode .settings:hover, html.dark-mode .icon-button:hover { background: var(--surface-raised); }
 html.dark-mode .sidebar nav button.active, html.dark-mode .sidebar nav a.active { color: var(--ink); background: #3b5046; }
-html.dark-mode .active-setting { color: #a8efc8 !important; background: #355044 !important; }
+html.dark-mode .active-setting { color: #a8efc8 !important; background: #000000 !important; }
 html.dark-mode .search, html.dark-mode .filter-bar, html.dark-mode .table-tools, html.dark-mode .recommendation-tools, html.dark-mode .pagination, html.dark-mode .recommendation-pagination, html.dark-mode th { color: var(--ink); background: var(--surface-soft); }
 html.dark-mode .search { color: var(--muted); }
 html.dark-mode input, html.dark-mode textarea, html.dark-mode select { color: var(--ink); border-color: var(--border); background: var(--surface-input); color-scheme: dark; }
@@ -506,3 +506,30 @@ html.dark-mode .inventory-order-modal-scrim, html.dark-mode .inventory-order-dra
 
 /* Customer lookup in the payment modal */
 .payment-customer-search { position: relative; margin-top: 24px; }.payment-customer-label { display: block; margin-bottom: 8px; color: var(--muted); font-size: 12px; }.payment-customer-input-wrap { position: relative; }.payment-customer-input-wrap > svg { position: absolute; z-index: 1; top: 50%; left: 22px; color: var(--muted); transform: translateY(-50%); pointer-events: none; }.payment-member-search { width: 100%; height: 72px; margin-top: 0; padding: 0 24px 0 54px; border: 1px solid var(--border); border-radius: 11px; background: #fff; }.payment-customer-results { position: absolute; z-index: 5; top: calc(100% + 7px); right: 0; left: 0; max-height: 230px; overflow-y: auto; padding: 6px; border: 1px solid var(--border); border-radius: 10px; background: #fff; box-shadow: 0 12px 28px rgba(11,28,48,.16); }.payment-customer-results button { width: 100%; padding: 11px 12px; border: 0; border-radius: 7px; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; color: var(--ink); background: #fff; text-align: left; cursor: pointer; }.payment-customer-results button:hover { background: #eef8f3; }.payment-customer-results button small, .payment-customer-selected small { color: var(--muted); font-size: 11px; }.payment-customer-empty { padding: 12px 10px; color: var(--muted); font-size: 12px; text-align: center; }.payment-customer-empty.error { color: #a51f26; }.payment-customer-selected { min-height: 72px; padding: 12px 14px; border: 1px solid var(--green); border-radius: 11px; display: flex; align-items: center; justify-content: space-between; gap: 12px; background: #f0faf5; }.payment-customer-selected > div { min-width: 0; display: flex; flex-direction: column; gap: 3px; }.payment-customer-selected strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.payment-customer-selected button { flex: 0 0 auto; padding: 8px 10px; border: 1px solid var(--green); border-radius: 6px; color: var(--green); background: #fff; cursor: pointer; }
+
+/* All backgrounds are black while dark mode is active. */
+html.dark-mode,
+html.dark-mode body,
+html.dark-mode body *,
+html.dark-mode body *::before,
+html.dark-mode body *::after {
+  background: #000000 !important;
+}
+
+/* All text is white while dark mode is active. */
+html.dark-mode,
+html.dark-mode body,
+html.dark-mode body *,
+html.dark-mode body *::before,
+html.dark-mode body *::after,
+html.dark-mode input::placeholder,
+html.dark-mode textarea::placeholder {
+  color: #ffffff !important;
+}
+
+/* Keep selectors that already use !important consistent with the dark theme. */
+html.dark-mode body .active-setting,
+html.dark-mode body .suggested-qty,
+html.dark-mode body .status-offline {
+  color: #ffffff !important;
+}
