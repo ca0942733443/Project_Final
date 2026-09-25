@@ -177,7 +177,10 @@ ordersRouter.post("/", asyncHandler(async (request, response) => {
   if (!Array.isArray(body.items) || body.items.length === 0) {
     throw new ApiError(400, "กรุณาระบุสินค้าอย่างน้อย 1 รายการ");
   }
-  if (!("cash qr credit".split(" ") as unknown[]).includes(body.paymentMethod)) {
+  if (body.paymentMethod === "credit") {
+    throw new ApiError(400, "ระบบขายเชื่อถูกปิดใช้งานชั่วคราว รองรับเฉพาะเงินสดและ QR PromptPay");
+  }
+  if (!("cash qr".split(" ") as unknown[]).includes(body.paymentMethod)) {
     throw new ApiError(400, "ช่องทางชำระเงินไม่ถูกต้อง");
   }
   const paymentMethod = body.paymentMethod as PaymentMethod;

@@ -8,6 +8,8 @@ interface SalesRecommendationRow extends RowDataPacket {
   productId: number;
   productName: string;
   categoryName: string;
+  supplierId: number | null;
+  supplierName: string | null;
   unit: string;
   weeklySalesQuantity: number;
   weeklyRevenue: number;
@@ -61,6 +63,8 @@ recommendationsRouter.get("/", asyncHandler(async (request, response) => {
       p.product_id AS productId,
       p.product_name AS productName,
       c.category_name AS categoryName,
+      p.supplier_id AS supplierId,
+      sup.supplier_name AS supplierName,
       p.base_unit AS unit,
       COALESCE(SUM(CASE WHEN s.sale_id IS NOT NULL THEN si.quantity_base ELSE 0 END), 0) AS weeklySalesQuantity,
       COALESCE(SUM(CASE WHEN s.sale_id IS NOT NULL THEN si.line_total ELSE 0 END), 0) AS weeklyRevenue,
@@ -68,6 +72,7 @@ recommendationsRouter.get("/", asyncHandler(async (request, response) => {
       p.reorder_point AS reorderPoint
     FROM products p
     INNER JOIN categories c ON c.category_id = p.category_id
+    LEFT JOIN suppliers sup ON sup.supplier_id = p.supplier_id
     LEFT JOIN product_units pu ON pu.product_id = p.product_id
     LEFT JOIN sale_items si ON si.product_unit_id = pu.product_unit_id
     LEFT JOIN sales s ON s.sale_id = si.sale_id
@@ -81,7 +86,7 @@ recommendationsRouter.get("/", asyncHandler(async (request, response) => {
     ) stock ON stock.product_id = p.product_id
     WHERE p.is_active = 1
     GROUP BY
-      p.product_id, p.product_name, c.category_name, p.base_unit,
+      p.product_id, p.product_name, c.category_name, p.supplier_id, sup.supplier_name, p.base_unit,
       stock.stockQuantity, p.reorder_point
     HAVING weeklySalesQuantity > 0 OR currentStock < reorderPoint
     ORDER BY weeklySalesQuantity DESC, weeklyRevenue DESC, p.product_name ASC
@@ -148,6 +153,8 @@ recommendationsRouter.get("/", asyncHandler(async (request, response) => {
       productId: row.productId,
       productName: row.productName,
       categoryName: row.categoryName,
+      supplierId: row.supplierId === null ? null : Number(row.supplierId),
+      supplierName: row.supplierName,
       unit: row.unit,
       weeklySalesQuantity,
       weeklyRevenue: Number(row.weeklyRevenue) || 0,

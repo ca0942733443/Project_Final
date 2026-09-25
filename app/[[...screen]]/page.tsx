@@ -8,9 +8,11 @@ import HistoryScreen from "../_screens/HistoryScreen";
 import InvenHistoryScreen from "../_screens/InvenHistoryScreen";
 import InventoryScreen from "../_screens/InventoryScreen";
 import InventoryOrdersScreen from "../_screens/InventoryOrdersScreen";
+import InventoryOrderCreateScreen from "../_screens/InventoryOrderCreateScreen";
 import LoginScreen from "../_screens/LoginScreen";
 import NotificationsScreen from "../_screens/NotificationsScreen";
 import PosScreen from "../_screens/PosScreen";
+import PurchaseOrderScreen from "../_screens/PurchaseOrderScreen";
 import ProductsScreen from "../_screens/ProductsScreen";
 import RecommendationsScreen from "../_screens/RecommendationsScreen";
 import SettingsScreen from "../_screens/SettingsScreen";
@@ -21,9 +23,11 @@ const routeScreens: Record<string, ComponentType> = {
   history: HistoryScreen,
   inventory: InventoryScreen,
   "inventory-orders": InventoryOrdersScreen,
+  "inventory-order-create": InventoryOrderCreateScreen,
   login: LoginScreen,
   notifications: NotificationsScreen,
   pos: PosScreen,
+  "purchase-order": PurchaseOrderScreen,
   products: ProductsScreen,
   recommendations: RecommendationsScreen,
   settings: SettingsScreen,

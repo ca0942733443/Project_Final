@@ -1,11 +1,10 @@
 "use client";
 
-import { Download, PackageCheck, Plus, X, Image as ImageIcon } from "lucide-react";
+import { Download, PackageCheck, Plus, X } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import AdminShell from "../_components/AdminShell";
 import { PageTitle, Stat } from "../_components/PageElements";
 import { apiFetch, errorMessage } from "../_lib/api";
-import Link from "next/link";
 
 type InventoryItem = {
   id: number;
@@ -29,19 +28,6 @@ type InventoryData = {
   stats: { totalStockValue: number; productCount: number; lowStockCount: number; outOfStockCount: number };
 };
 
-type InventoryMovement = {
-  id: number;
-  productName: string;
-  movementType: "opening" | "purchase" | "adjustment" | "return" | "sale";
-  quantity: number;
-  note: string | null;
-  createdAt: string;
-};
-
-type Supplier = { id: number; name: string };
-
-const statusLabels = { normal: "ปกติ", low: "สต็อกต่ำ", out: "สินค้าหมด" } as const;
-
 function formatExpiryDate(value: string | null) {
   if (!value) return "ไม่ระบุ";
   return new Date(value).toLocaleDateString("th-TH", { day: "2-digit", month: "short", year: "numeric" });
@@ -56,7 +42,6 @@ export default function InventoryScreen() {
   const [error, setError] = useState("");
   const [showReceive, setShowReceive] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [movements, setMovements] = useState<InventoryMovement[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
 
@@ -69,12 +54,8 @@ export default function InventoryScreen() {
       if (status) queryParams.append("status", status);
       if (sortBy) queryParams.append("sortBy", sortBy);
 
-      const [inventoryData, movementRows] = await Promise.all([
-        apiFetch<InventoryData>(`/inventory?${queryParams.toString()}`),
-        apiFetch<InventoryMovement[]>("/inventory/movements?limit=2"),
-      ]);
+      const inventoryData = await apiFetch<InventoryData>(`/inventory?${queryParams.toString()}`);
       setData(inventoryData);
-      setMovements(movementRows);
     } catch (loadError) {
       setError(errorMessage(loadError));
     } finally {
@@ -141,238 +122,134 @@ export default function InventoryScreen() {
     link.click();
     URL.revokeObjectURL(link.href);
   };
+  const [showExportModal, setShowExportModal] = useState(false);
+  const exportWord = () => {
+    if (!data) return;
 
+    const tableHeader = `
+      <tr style="background-color: #f1f5f9; font-weight: bold;">
+        <th style="border: 1px solid #cbd5e1; padding: 8px;">SKU</th>
+        <th style="border: 1px solid #cbd5e1; padding: 8px;">สินค้า</th>
+        <th style="border: 1px solid #cbd5e1; padding: 8px;">หมวดหมู่</th>
+        <th style="border: 1px solid #cbd5e1; padding: 8px;">วันหมดอายุ</th>
+        <th style="border: 1px solid #cbd5e1; padding: 8px;">ราคาขาย</th>
+        <th style="border: 1px solid #cbd5e1; padding: 8px;">คงเหลือ</th>
+        <th style="border: 1px solid #cbd5e1; padding: 8px;">สถานะ</th>
+      </tr>
+    `;
+
+    const tableRows = data.items.map((item) => {
+      const statusText = item.status === "out" ? "สินค้าหมด" : item.status === "low" ? "สต็อกต่ำ" : "ปกติ";
+      return `
+        <tr>
+          <td style="border: 1px solid #cbd5e1; padding: 8px;">${item.sku || "—"}</td>
+          <td style="border: 1px solid #cbd5e1; padding: 8px;">${item.name}</td>
+          <td style="border: 1px solid #cbd5e1; padding: 8px;">${item.categoryName}</td>
+          <td style="border: 1px solid #cbd5e1; padding: 8px;">${formatExpiryDate(item.expiryDate)}</td>
+          <td style="border: 1px solid #cbd5e1; padding: 8px; text-align: right;">฿${item.price.toLocaleString("th-TH", { minimumFractionDigits: 2 })}</td>
+          <td style="border: 1px solid #cbd5e1; padding: 8px; text-align: right;">${item.stockQuantity.toLocaleString("th-TH")} ${item.unit}</td>
+          <td style="border: 1px solid #cbd5e1; padding: 8px; text-align: center;">${statusText}</td>
+        </tr>
+      `;
+    }).join("");
+
+    const wordContent = `
+      <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+      <head>
+        <meta charset='utf-8'>
+        <title>รายงานคลังสินค้า</title>
+        <style>
+          body { font-family: 'Sarabun', 'Tahoma', sans-serif; }
+          table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+          h2 { color: #0f172a; margin-bottom: 4px; }
+        </style>
+      </head>
+      <body>
+        <h2>รายงานข้อมูลคลังสินค้า</h2>
+        <p style="color: #64748b; font-size: 14px;">วันที่ออกรายงาน: ${new Date().toLocaleDateString("th-TH")}</p>
+        <table>
+          <thead>${tableHeader}</thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      </body>
+      </html>
+    `;
+
+    const blob = new Blob(["\ufeff", wordContent], { type: "application/msword" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "รายงานคลังสินค้า.doc";
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
+  
   return (<AdminShell active="inventory">
     <PageTitle title="การจัดการคลังสินค้า" subtitle="ตรวจสอบและจัดการสต็อกจากฐานข้อมูลจริง" action={<button className="primary-button" onClick={() => setShowReceive(true)}><PackageCheck size={17} /> รับสินค้าเข้า</button>} />
     <div className="stat-grid four"><Stat label="มูลค่าสินค้าในคลังทั้งหมด" value={`฿${(stats?.totalStockValue ?? 0).toLocaleString("th-TH", { maximumFractionDigits: 2 })}`} /><Stat label="จำนวนรายการสินค้า" value={`${stats?.productCount ?? 0} รายการ`} tone="neutral" /><Stat label="สินค้าสต็อกต่ำ" value={`${stats?.lowStockCount ?? 0}`} tone="orange" note="ควรเติมสินค้าทันที" /><Stat label="สินค้าหมด" value={`${stats?.outOfStockCount ?? 0}`} tone="red" /></div>
     <section className="data-card inventory-stock-card">
-      <div className="table-tools"><select aria-label="หมวดหมู่"><option>ทุกหมวดหมู่</option></select><select value={status} onChange={event => setStatus(event.target.value)}><option value="">สถานะ: ทั้งหมด</option><option value="normal">สถานะ: ปกติ</option><option value="low">สถานะ: สต็อกต่ำ</option><option value="out">สถานะ: สินค้าหมด</option></select><button onClick={exportCsv}><Download size={15} /> ส่งออก</button></div>
-      {loading && <div className="api-message">กำลังโหลดข้อมูลสต็อก...</div>}
-      {error && <div className="api-message error">{error}</div>}
-      <div className="inventory-table">
-        <div className="table-wrap"><table><thead><tr>{["สินค้า", "SKU", "คงเหลือ", "มูลค่าสต็อก", "ล็อต", "หมดอายุ", "สถานะสต็อก"].map(title => <th key={title}>{title}</th>)}</tr></thead><tbody>{data?.items.slice(0, 3).map(item => <tr className={item.status === "out" ? "expired-row" : ""} key={item.id}><td>{item.name}</td><td>{item.sku}</td><td className={item.status !== "normal" ? "danger-text" : ""}>{item.stockQuantity.toLocaleString("th-TH")} {item.unit}</td><td>฿{item.stockValue.toLocaleString("th-TH", { minimumFractionDigits: 2 })}</td><td>{item.lotNo ?? "—"}</td><td>{formatExpiryDate(item.expiryDate)}</td><td><span className={`status-pill ${item.status === "out" ? "s-2" : item.status === "low" ? "s-1" : "s-0"}`}>{statusLabels[item.status]}</span></td></tr>)}</tbody></table></div>
-        <div className="pagination"><span>แสดง {data?.items.length ? 1 : 0} ถึง {data?.items.length ?? 0} จาก {data?.items.length ?? 0} รายการ</span><div><button aria-label="หน้าก่อนหน้า" disabled>‹</button><button className="selected" aria-current="page">1</button><button aria-label="หน้าถัดไป" disabled>›</button></div></div>
-      </div>
-
-      <section className="data-card inventory-stock-card">
-        <div className="table-tools" style={{ display: "flex", gap: "12px", alignItems: "center", width: "100%" }}>
-          <input
-            type="text" 
-            placeholder="ค้นหาชื่อสินค้า..." 
-            value={search} 
-            onChange={(e) => setSearch(e.target.value)}
-            style={{
-              height: "40px",
-              fontSize: "13px",
-              padding: "0 12px",
-              borderRadius: "8px",
-              border: "1px solid #cbd5e1",
-              minWidth: "220px",
-              outline: "none",
-              boxSizing: "border-box"
-            }}
-          />
-
-          <div style={{ marginLeft: "auto", display: "flex", gap: "12px" }}>
-            <select 
-              value={status} 
-              onChange={(e) => setStatus(e.target.value)}
-              style={{
-                height: "40px",
-                fontSize: "13px",
-                padding: "0 12px",
-                borderRadius: "8px",
-                border: "1px solid #cbd5e1",
-                outline: "none",
-                backgroundColor: "#fff",
-                cursor: "pointer",
-                boxSizing: "border-box"
-              }}
-            >
+      <div className="inventory-toolbar">
+        <label className="inventory-search">
+          <span className="sr-only">ค้นหาสินค้า</span>
+          <input type="search" placeholder="ค้นหาชื่อสินค้า หรือ SKU..." value={search} onChange={(event) => setSearch(event.target.value)} />
+        </label>
+        <div className="inventory-toolbar-actions">
+          <select value={status} onChange={(event) => setStatus(event.target.value)} aria-label="กรองตามสถานะ">
               <option value="">สถานะ: ทั้งหมด</option>
               <option value="normal">สถานะ: ปกติ</option>
               <option value="low">สถานะ: สต็อกต่ำ</option>
               <option value="out">สถานะ: สินค้าหมด</option>
-            </select>
-
-            <select 
-              value={sortBy} 
-              onChange={(e) => setSortBy(e.target.value)}
-              style={{
-                height: "40px",
-                fontSize: "13px",
-                padding: "0 12px",
-                borderRadius: "8px",
-                border: "1px solid #cbd5e1",
-                outline: "none",
-                backgroundColor: "#fff",
-                cursor: "pointer",
-                boxSizing: "border-box"
-              }}
-            >
+          </select>
+          <select value={sortBy} onChange={(event) => setSortBy(event.target.value)} aria-label="เรียงลำดับสินค้า">
               <option value="expiryAsc">เรียงตาม: วันหมดอายุเร็วที่สุด</option>
               <option value="stockDesc">เรียงตาม: สต็อกคลังมากที่สุด</option>
               <option value="stockAsc">เรียงตาม: สต็อกคลังน้อยที่สุด</option>
-            </select>
-          </div>
+          </select>
+          {/* <button type="button" className="inventory-export" onClick={exportCsv}><Download size={16} /> ส่งออก</button> */}
+          <button type="button" className="inventory-export" onClick={() => setShowExportModal(true)}> <Download size={16} /> ส่งออก </button>
         </div>
+      </div>
 
-        {loading && <div className="api-message">กำลังโหลดข้อมูลสต็อก...</div>}
-        {error && <div className="api-message error">{error}</div>}
+      {loading && <div className="api-message">กำลังโหลดข้อมูลสต็อก...</div>}
+      {error && <div className="api-message error">{error}</div>}
 
-        <div className="inventory-table">
-          <div className="table-wrapper" style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <div className="inventory-table inventory-table-single">
+          <div className="table-wrap">
+            <table>
               <thead>
-                <tr style={{ background: "#f1f5f9" }}>
-                  {["สินค้า", "SKU", "หมวดหมู่", "วันหมดอายุ", "ราคาขาย", "คงเหลือ", "สถานะ", "จัดการ"].map((title) => (
-                    <th
-                      key={title}
-                      style={{
-                        padding: "10px 16px",
-                        fontSize: "13px",
-                        fontWeight: "400",
-                        color: "#475569",
-                        borderBottom: "1px solid #e2e8f0",
-                        textAlign: "center",
-                      }}
-                    >
-                      {title}
-                    </th>
-                  ))}
-                </tr>
+                <tr>{["สินค้า", "SKU", "หมวดหมู่", "วันหมดอายุ", "ราคาขาย", "คงเหลือ", "สถานะ", "จัดการ"].map((title) => <th key={title}>{title}</th>)}</tr>
               </thead>
               <tbody>
                 {paginatedItems.map((item) => {
-                  let statusText = "ปกติ";
-                  let statusStyle: React.CSSProperties = {
-                    backgroundColor: "#e6f4ea",
-                    color: "#137333",
-                    border: "1px solid #a8dab5",
-                  };
-
-                  if (item.stockQuantity <= 0) {
-                    statusText = "สินค้าหมด";
-                    statusStyle = {
-                      backgroundColor: "#fce8e6",
-                      color: "#c5221f",
-                      border: "1px solid #f5c2c7",
-                    };
-                  } else if (item.stockQuantity <= (item.lowStockThreshold || 5)) {
-                    statusText = "สต็อกต่ำ";
-                    statusStyle = {
-                      backgroundColor: "#fef7e0",
-                      color: "#b06000",
-                      border: "1px solid #fde293",
-                    };
-                  }
+                  const statusClass = item.status === "out" ? "out" : item.status === "low" ? "low" : "normal";
 
                   return (
-                    <tr key={item.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                      {/* 1. สินค้า (ดึง imageUrl + Fallback แสดงตัวอักษรแรกสไตล์ Customer) */}
-                      <td style={{ padding: "12px 16px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <tr key={item.id}>
+                      <td className="inventory-product-cell">
+                        <div className="inventory-product">
                           {item.imageUrl ? (
-                            <img
-                              src={item.imageUrl}
-                              alt={item.name}
-                              style={{
-                                width: "40px",
-                                height: "40px",
-                                borderRadius: "12px",
-                                objectFit: "cover",
-                                border: "1px solid #e2e8f0",
-                                flexShrink: 0
-                              }}
-                            />
+                            <img src={item.imageUrl} alt={item.name} />
                           ) : (
-                            <div
-                              style={{
-                                width: "40px",
-                                height: "40px",
-                                borderRadius: "12px",
-                                backgroundColor: "#e6f4ea",
-                                color: "#046c4e",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                fontSize: "18px",
-                                fontWeight: "600",
-                                textTransform: "uppercase",
-                                flexShrink: 0
-                              }}
-                            >
-                              {item.name ? item.name.charAt(0) : "-"}
-                            </div>
+                            <span className="inventory-product-fallback">{item.name ? item.name.charAt(0) : "-"}</span>
                           )}
-                          <div>
-                            <span style={{ display: "block", color: "#0f172a", fontSize: "14px", fontWeight: "normal" }}>
-                              {item.name}
-                            </span>
-                          </div>
+                          <strong>{item.name}</strong>
                         </div>
                       </td>
-
-                      {/* 2. SKU */}
-                      <td style={{ padding: "12px 16px", color: "#475569", fontSize: "14px", fontWeight: "normal", textAlign: "center" }}>
-                        {item.sku || "-"}
-                      </td>
-
-                      {/* 3. หมวดหมู่ */}
-                      <td style={{ padding: "12px 16px", color: "#475569", fontSize: "14px", fontWeight: "normal", textAlign: "center" }}>
-                        {item.categoryName}
-                      </td>
-
-                      {/* 4. วันหมดอายุ */}
-                      <td style={{ padding: "12px 16px", color: "#64748b", fontSize: "14px", fontWeight: "normal", textAlign: "center" }}>
-                        {item.expiryDate
-                          ? new Date(item.expiryDate).toLocaleDateString("th-TH", {
-                              day: "2-digit",
-                              month: "short",
-                              year: "numeric",
-                              timeZone: "UTC",
-                            })
-                          : "—"}
-                      </td>
-
-                      {/* 5. ราคาขาย */}
-                      <td style={{ padding: "12px 16px", color: "#0f172a", fontSize: "13px", fontWeight: "normal", textAlign: "center" }}>
-                        ฿{item.price.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
-                      </td>
-
-                      {/* 6. คงเหลือ */}
-                      <td style={{ padding: "12px 16px", color: "#0f172a", fontSize: "13px", fontWeight: "normal", textAlign: "center" }}>
-                        {item.stockQuantity.toLocaleString("th-TH")} {item.unit}
-                      </td>
-
-                      {/* 7. สถานะ */}
-                      <td style={{ padding: "12px 16px", textAlign: "center" }}>
-                        <span
-                          style={{
-                            display: "inline-block",
-                            padding: "4px 12px",
-                            borderRadius: "16px",
-                            fontSize: "12px",
-                            fontWeight: "normal",
-                            lineHeight: "1.4",
-                            ...statusStyle,
-                          }}
-                        >
-                          {statusText}
-                        </span>
-                      </td>
-
-                      {/* 8. จัดการ */}
-                      <td style={{ padding: "12px 16px", textAlign: "center" }}>
-                        <div style={{ display: "flex", justifyContent: "center", gap: "6px" }}>
+                      <td><code className="inventory-sku">{item.sku || "—"}</code></td>
+                      <td>{item.categoryName}</td>
+                      <td>{formatExpiryDate(item.expiryDate)}</td>
+                      <td className="inventory-price">฿{item.price.toLocaleString("th-TH", { minimumFractionDigits: 2 })}</td>
+                      <td className="inventory-quantity">{item.stockQuantity.toLocaleString("th-TH")} <small>{item.unit}</small></td>
+                      <td><span className={`inventory-status ${statusClass}`}>{item.status === "out" ? "สินค้าหมด" : item.status === "low" ? "สต็อกต่ำ" : "ปกติ"}</span></td>
+                      <td>
+                        <div className="inventory-row-actions">
                           <button
-                            className="tiny-button"
+                            className="tiny-button inventory-receive-button"
                             onClick={() => {
                               setSelectedProductId(item.id);
                               setShowReceive(true);
                             }}
-                            style={{ padding: "6px", borderRadius: "6px", border: "1px solid #cbd5e1" }}
                             type="button"
+                            aria-label={`รับสินค้า ${item.name}`}
                           >
                             <Plus size={14} />
                           </button>
@@ -385,75 +262,25 @@ export default function InventoryScreen() {
             </table>
           </div>
 
-          {/* Pagination UI */}
-          <div 
-            className="pagination" 
-            style={{ 
-              display: "flex", 
-              justifyContent: "space-between", 
-              alignItems: "center", 
-              padding: "12px 16px" 
-            }}
-          >
-            <span style={{ fontSize: "12px", color: "#64748b", padding: "10px"}}>
+          <div className="pagination inventory-pagination">
+            <span>
               แสดง {filteredItems.length ? startIndex + 1 : 0} ถึง {Math.min(startIndex + itemsPerPage, filteredItems.length)} จาก {filteredItems.length} รายการ
             </span>
-
-            <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+            <div>
               <button
                 type="button"
                 aria-label="หน้าก่อนหน้า"
                 disabled={currentPage === 1}
                 onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                style={{
-                  width: "36px",
-                  height: "36px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderRadius: "8px",
-                  border: "1.5px solid #cbd5e1",
-                  backgroundColor: "#fff",
-                  color: currentPage === 1 ? "#cbd5e1" : "#475569",
-                  cursor: currentPage === 1 ? "not-allowed" : "pointer",
-                  fontSize: "18px",
-                  fontWeight: "bold"
-                }}
               >
                 ‹
               </button>
-
-              <span 
-                style={{ 
-                  fontSize: "14px", 
-                  fontWeight: "700", 
-                  color: "#064e3b", 
-                  padding: "0 4px",
-                  userSelect: "none"
-                }}
-              >
-                {currentPage} of {totalPages}
-              </span>
-
+              <span className="inventory-page-indicator">{currentPage} / {totalPages}</span>
               <button
                 type="button"
                 aria-label="หน้าถัดไป"
                 disabled={currentPage >= totalPages}
                 onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                style={{
-                  width: "36px",
-                  height: "36px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderRadius: "8px",
-                  border: "1.5px solid #cbd5e1",
-                  backgroundColor: "#fff",
-                  color: currentPage >= totalPages ? "#cbd5e1" : "#475569",
-                  cursor: currentPage >= totalPages ? "not-allowed" : "pointer",
-                  fontSize: "18px",
-                  fontWeight: "bold"
-                }}
               >
                 ›
               </button>
@@ -461,45 +288,9 @@ export default function InventoryScreen() {
           </div>
         </div>
 
-        {!loading && data?.items.length === 0 && <div className="api-message">ไม่พบสินค้าในสถานะที่เลือก</div>}
-      </section>
+      {!loading && data?.items.length === 0 && <div className="api-message">ไม่พบสินค้าในสถานะที่เลือก</div>}
     </section>
 
-      {/* ประวัติการเคลื่อนย้ายสินค้า */}
-      <section className="inventory-movement-card">
-        <h2>ประวัติการเคลื่อนย้ายสินค้าล่าสุด</h2>
-        <div className="movement-list">
-          {movements.map((movement, index) => (
-            <article className={`movement-item movement-${index % 2}`} key={movement.id}>
-              <span className="movement-icon">⇥</span>
-              <div>
-                <strong>
-                  {movement.movementType === "purchase" ? "รับเข้าคลัง" : movement.movementType === "sale" ? "ขายออกหน้าร้าน" : "ย้ายไปหน้าร้าน"}: {movement.productName}
-                </strong>
-                <small>{movement.note ?? `อัปเดตเมื่อ ${new Date(movement.createdAt).toLocaleString("th-TH")}`}</small>
-              </div>
-              <b className={movement.quantity < 0 ? "danger-text" : ""}>
-                {movement.quantity > 0 ? "+" : ""}{movement.quantity.toLocaleString("th-TH")} หน่วย
-              </b>
-            </article>
-          ))}
-        </div>
-        <Link
-          href="/inven-history"
-          className="movement-link"
-          style={{
-            display: "block",
-            textAlign: "center",
-            textDecoration: "none",
-            marginTop: "16px",
-            marginLeft: "auto",
-            marginRight: "auto",
-            width: "fit-content"
-          }}
-        >
-          ดูประวัติทั้งหมด
-        </Link>
-      </section>
 
       {/* Modal รับสินค้าเข้า */}
       {showReceive && (
@@ -590,6 +381,82 @@ export default function InventoryScreen() {
               {saving ? "กำลังบันทึก..." : "บันทึกรับเข้า"}
             </button>
           </form>
+        </div>
+      )}
+
+      {/* 🟢 Modal สำหรับเลือกประเภทการส่งออก */}
+      {showExportModal && (
+        <div className="modal-backdrop" onClick={() => setShowExportModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "420px", textAlign: "center" }}>
+            <button type="button" className="modal-close" onClick={() => setShowExportModal(false)}>
+              <X />
+            </button>
+            
+            <h2 style={{ marginBottom: "8px", fontSize: "18px" }}>ส่งออกรายงานคลังสินค้า</h2>
+            <p style={{ color: "#64748b", fontSize: "14px", marginBottom: "20px" }}>
+              เลือกรูปแบบไฟล์ที่ต้องการดาวน์โหลด
+            </p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              {/* ตัวเลือกที่ 1: Word */}
+              <button
+                type="button"
+                onClick={() => {
+                  exportWord();
+                  setShowExportModal(false);
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  padding: "14px 16px",
+                  border: "1px solid #cbd5e1",
+                  borderRadius: "10px",
+                  backgroundColor: "#fff",
+                  cursor: "pointer",
+                  textAlign: "left",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#f8fafc")}
+                onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "#fff")}
+              >
+                <div style={{ fontSize: "24px" }}></div>
+                <div>
+                  <strong style={{ display: "block", color: "#1e293b", fontSize: "15px" }}>Microsoft Word (.doc)</strong>
+                  <span style={{ fontSize: "12px", color: "#64748b" }}>รูปแบบตาราง สามารถเปิดอ่านหรือสั่งพิมพ์ได้</span>
+                </div>
+              </button>
+
+              {/* ตัวเลือกที่ 2: CSV */}
+              <button
+                type="button"
+                onClick={() => {
+                  exportCsv();
+                  setShowExportModal(false);
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  padding: "14px 16px",
+                  border: "1px solid #cbd5e1",
+                  borderRadius: "10px",
+                  backgroundColor: "#fff",
+                  cursor: "pointer",
+                  textAlign: "left",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#f8fafc")}
+                onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "#fff")}
+              >
+                <div style={{ fontSize: "24px" }}></div>
+                <div>
+                  <strong style={{ display: "block", color: "#1e293b", fontSize: "15px" }}>CSV File (.csv)</strong>
+                  <span style={{ fontSize: "12px", color: "#64748b" }}>สำหรับนำไปวิเคราะห์ข้อมูลต่อใน Excel หรือระบบอื่น</span>
+                </div>
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </AdminShell>

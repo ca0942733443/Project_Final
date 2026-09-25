@@ -202,27 +202,76 @@ async function run() {
     await api(`/inventory-orders/${inventoryOrder.id}`, token, { method: "PATCH", body: JSON.stringify({ status: "PENDING_APPROVAL" }) });
     await api(`/inventory-orders/${inventoryOrder.id}`, token, { method: "PATCH", body: JSON.stringify({ status: "APPROVED" }) });
 
-    const cashSale = await api<{ orderNumber: string }>("/orders", token, {
+    const cashSale = await api<{ orderNumber: string; total: number; amountReceived: number; changeAmount: number; paymentMethod: "cash" | "qr" }>("/orders", token, {
       method: "POST",
-      body: JSON.stringify({ paymentMethod: "cash", amountReceived: 200, items: [{ productId: product.id, quantity: 2 }] }),
+      body: JSON.stringify({ paymentMethod: "cash", amountReceived: 200, customerId: customer.id, items: [{ productId: product.id, quantity: 2 }] }),
     });
-    const qrSale = await api<{ orderNumber: string }>("/orders", token, {
-      method: "POST",
-      body: JSON.stringify({ paymentMethod: "qr", items: [{ productId: product.id, quantity: 1 }] }),
-    });
-    const creditSale = await api<{ orderNumber: string }>("/orders", token, {
-      method: "POST",
-      body: JSON.stringify({ paymentMethod: "credit", customerId: customer.id, items: [{ productId: product.id, quantity: 1 }] }),
-    });
+    if (cashSale.paymentMethod !== "cash" || cashSale.amountReceived < cashSale.total || cashSale.changeAmount <= 0) {
+      throw new Error("Cash payment did not complete with the expected amount and change");
+    }
 
-    await api(`/orders/${cashSale.orderNumber}`, token);
-    await api(`/orders/${qrSale.orderNumber}`, token);
-    await api(`/orders/${creditSale.orderNumber}`, token);
-    await api("/orders?paymentMethod=cash", token);
-    await api("/orders?paymentMethod=qr", token);
-    await api("/orders?paymentMethod=credit", token);
-    await api("/dashboard?period=day", token);
-    await api("/recommendations?inactivityDays=3", token);
+    const qrSale = await api<{ orderNumber: string; total: number; amountReceived: number; changeAmount: number; paymentMethod: "cash" | "qr" }>("/orders", token, {
+      method: "POST",
+      body: JSON.stringify({ paymentMethod: "qr", customerId: customer.id, items: [{ productId: product.id, quantity: 1 }] }),
+    });
+    if (qrSale.paymentMethod !== "qr" || qrSale.amountReceived !== qrSale.total || qrSale.changeAmount !== 0) {
+      throw new Error("QR payment did not complete with the expected amount");
+    }
+
+    let creditRejected = false;
+    try {
+      await api("/orders", token, {
+        method: "POST",
+        body: JSON.stringify({ paymentMethod: "credit", customerId: customer.id, items: [{ productId: product.id, quantity: 1 }] }),
+      });
+    } catch (creditError) {
+      if (creditError instanceof Error && creditError.message.includes("ขายเชื่อ")) creditRejected = true;
+      else throw creditError;
+    }
+    if (!creditRejected) {
+      throw new Error("Credit sales should be disabled");
+    }
+
+    type OrderDetail = {
+      orderNumber: string;
+      total: number;
+      items: Array<{ productId: number }>;
+      payments: Array<{ method: "cash" | "qr"; amountReceived: number; amountPaid: number; changeAmount: number }>;
+    };
+    const cashDetail = await api<OrderDetail>(`/orders/${cashSale.orderNumber}`, token);
+    const qrDetail = await api<OrderDetail>(`/orders/${qrSale.orderNumber}`, token);
+    if (cashDetail.payments[0]?.method !== "cash" || cashDetail.payments[0]?.changeAmount <= 0) throw new Error("Cash receipt payment detail is incorrect");
+    if (qrDetail.payments[0]?.method !== "qr" || qrDetail.payments[0]?.amountPaid !== qrSale.total) throw new Error("QR receipt payment detail is incorrect");
+    if (cashDetail.items[0]?.productId !== product.id || qrDetail.items[0]?.productId !== product.id) throw new Error("Receipt item detail is incorrect");
+
+    const cashOrders = await api<{ items: Array<{ orderNumber: string }> }>("/orders?paymentMethod=cash", token);
+    const qrOrders = await api<{ items: Array<{ orderNumber: string }> }>("/orders?paymentMethod=qr", token);
+    if (!cashOrders.items.some((order) => order.orderNumber === cashSale.orderNumber)) throw new Error("Cash payment filter did not return the completed sale");
+    if (!qrOrders.items.some((order) => order.orderNumber === qrSale.orderNumber)) throw new Error("QR payment filter did not return the completed sale");
+
+    const dashboard = await api<{ paymentBreakdown: Array<{ method: "cash" | "qr" | "credit"; total: number }> }>("/dashboard?period=day", token);
+    for (const method of ["cash", "qr"] as const) {
+      if (!dashboard.paymentBreakdown.some((row) => row.method === method && Number(row.total) > 0)) {
+        throw new Error(`Dashboard payment breakdown is missing ${method}`);
+      }
+    }
+    await connection.query(
+      "UPDATE sales SET sold_at = DATE_SUB(NOW(), INTERVAL 4 DAY) WHERE customer_id = ?",
+      [customer.id],
+    );
+    const recommendationData = await api<{
+      customers: Array<{
+        customerId: number;
+        daysSinceLastPurchase: number;
+        products: Array<{ productId: number }>;
+      }>;
+    }>("/recommendations?inactivityDays=3", token);
+    const inactiveCustomer = recommendationData.customers.find((row) => row.customerId === customer.id);
+    if (!inactiveCustomer) throw new Error("Recommendation did not return the inactive test customer");
+    if (inactiveCustomer.daysSinceLastPurchase < 3) throw new Error("Inactive customer day calculation is incorrect");
+    if (!inactiveCustomer.products.some((row) => row.productId === product.id)) {
+      throw new Error("Recommendation did not include the customer's purchased product");
+    }
     await api("/inventory", token);
     await api("/inventory/movements", token);
     await api("/customers", token);
@@ -243,8 +292,8 @@ async function run() {
         "products POST/GET/PATCH/DELETE",
         "inventory GET/POST",
         "inventory-orders GET/POST/PATCH/detail",
-        "orders cash/qr/credit POST/GET",
-        "dashboard/recommendations/categories read routes",
+        "orders cash/qr POST/GET and credit rejection",
+        "dashboard/recommendations inactive-customer logic/categories read routes",
       ],
     }));
   } finally {
