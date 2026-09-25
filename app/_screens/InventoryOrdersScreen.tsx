@@ -18,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import AdminShell from "../_components/AdminShell";
 import { PageTitle } from "../_components/PageElements";
 import { apiFetch, errorMessage } from "../_lib/api";
@@ -241,7 +242,7 @@ export default function InventoryOrdersScreen() {
   };
 
   return <AdminShell active="inventory-orders">
-    <PageTitle title="คำสั่งซื้อสินค้าคงคลัง" subtitle="วางแผนเติมสต็อกจากระดับสินค้าคงคลังและรายการแนะนำ" action={<button className="primary-button inventory-order-create-button" type="button" onClick={openCreate}><FilePlus2 size={17} /> สร้างคำสั่งซื้อ</button>} />
+    <PageTitle title="คำสั่งซื้อสินค้าคงคลัง" subtitle="วางแผนเติมสต็อกจากระดับสินค้าคงคลังและรายการแนะนำ" action={<Link className="primary-button inventory-order-create-button" href="/inventory-order-create"><FilePlus2 size={17} /> สร้างคำสั่งซื้อ</Link>} />
 
     <section className="inventory-order-summary" aria-label="สรุปคำสั่งซื้อสินค้าคงคลัง">
       <article className="inventory-order-summary-card"><span><ClipboardList size={17} /> คำสั่งซื้อทั้งหมด</span><strong>{summary.totalOrders.toLocaleString("th-TH")}</strong><small>รายการที่บันทึกในระบบ</small></article>
@@ -260,7 +261,7 @@ export default function InventoryOrdersScreen() {
       <div className="inventory-order-table-heading"><div><h2>รายการคำสั่งซื้อสินค้าคงคลัง</h2><p>{loading ? "กำลังโหลดข้อมูล..." : `พบ ${filteredOrders.length.toLocaleString("th-TH")} รายการ`}</p></div><span><i /> เชื่อมต่อ Database แล้ว</span></div>
       {loading && <div className="inventory-order-loading"><span className="loading-spinner" /> กำลังโหลดคำสั่งซื้อ...</div>}
       {!loading && visibleOrders.length === 0 && <div className="inventory-order-empty"><AlertTriangle size={27} /><strong>ยังไม่มีคำสั่งซื้อในมุมมองนี้</strong><span>เลือกสินค้าสต็อกต่ำแล้วกด “สร้างคำสั่งซื้อ” เพื่อเริ่มรายการใหม่</span></div>}
-      {!loading && visibleOrders.length > 0 && <div className="table-wrap inventory-order-table-wrap"><table><thead><tr><th>คำสั่งซื้อ</th><th>วันที่สร้าง</th><th>สินค้า</th><th>ผู้จำหน่าย</th><th>จำนวนที่สั่ง</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody>{visibleOrders.map((order) => <tr key={order.id}><td><strong className="inventory-order-number">{order.orderNumber}</strong><small>{order.note ?? "ไม่มีหมายเหตุ"}</small></td><td>{formatDate(order.orderDate)}</td><td><strong>{order.itemCount}</strong> รายการ</td><td><span className="inventory-order-supplier">{order.supplierNames ?? "ผู้จำหน่ายทั่วไป"}</span></td><td><strong className="inventory-order-quantity">{formatQuantity(order.totalQuantity)}</strong> หน่วย</td><td><span className={statusClasses[order.status]}>{statusLabels[order.status]}</span></td><td><button type="button" className="inventory-order-view" onClick={() => void openDetail(order)}><Eye size={15} /> รายละเอียด</button></td></tr>)}</tbody></table></div>}
+      {!loading && visibleOrders.length > 0 && <div className="table-wrap inventory-order-table-wrap"><table><thead><tr><th>คำสั่งซื้อ</th><th>วันที่สร้าง</th><th>สินค้า</th><th>ผู้จำหน่าย</th><th>จำนวนที่สั่ง</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody>{visibleOrders.map((order) => <tr key={order.id}><td><strong className="inventory-order-number">{order.orderNumber}</strong><small>{order.note ?? "ไม่มีหมายเหตุ"}</small></td><td>{formatDate(order.orderDate)}</td><td><strong>{order.itemCount}</strong> รายการ</td><td><span className="inventory-order-supplier">{order.supplierNames ?? "ผู้จำหน่ายทั่วไป"}</span></td><td><strong className="inventory-order-quantity">{formatQuantity(order.totalQuantity)}</strong> หน่วย</td><td><span className={statusClasses[order.status]}>{statusLabels[order.status]}</span></td><td><div className="inventory-order-row-actions"><Link className="inventory-order-view" href={`/purchase-order?id=${order.id}`}><ClipboardList size={15} /> ดู PO</Link><button type="button" className="inventory-order-view" onClick={() => void openDetail(order)}><Eye size={15} /> รายละเอียด</button></div></td></tr>)}</tbody></table></div>}
       <div className="inventory-order-pagination"><span>แสดง {filteredOrders.length ? (page - 1) * pageSize + 1 : 0}-{Math.min(page * pageSize, filteredOrders.length)} จาก {filteredOrders.length} รายการ</span><div><button type="button" aria-label="หน้าก่อนหน้า" disabled={page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))}><ChevronLeft size={16} /></button><strong>หน้า {page} / {totalPages}</strong><button type="button" aria-label="หน้าถัดไป" disabled={page >= totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))}><ChevronRight size={16} /></button></div></div>
     </section>
 

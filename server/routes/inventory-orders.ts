@@ -203,7 +203,7 @@ inventoryOrdersRouter.get("/:id", asyncHandler(async (request, response) => {
 }));
 
 inventoryOrdersRouter.post("/", asyncHandler(async (request, response) => {
-  const body = request.body as { note?: unknown; items?: Array<{ productId?: unknown; quantity?: unknown }> };
+  const body = request.body as { note?: unknown; splitBySupplier?: unknown; items?: Array<{ productId?: unknown; quantity?: unknown }> };
   if (!Array.isArray(body.items) || body.items.length === 0) {
     throw new ApiError(400, "กรุณาเลือกสินค้าอย่างน้อย 1 รายการ");
   }
@@ -220,34 +220,51 @@ inventoryOrdersRouter.post("/", asyncHandler(async (request, response) => {
   const placeholders = productIds.map(() => "?").join(",");
   const createdBy = authenticatedUserId(response);
   const note = optionalNote(body.note);
+  const splitBySupplier = body.splitBySupplier === true;
   const connection = await pool.getConnection();
 
   try {
     await connection.beginTransaction();
-    const [products] = await connection.query<Array<RowDataPacket & { id: number }>>(`
-      SELECT product_id AS id
+    const [products] = await connection.query<Array<RowDataPacket & { id: number; supplierId: number | null }>>(`
+      SELECT product_id AS id, supplier_id AS supplierId
       FROM products
       WHERE product_id IN (${placeholders}) AND is_active = 1
       FOR UPDATE
     `, productIds);
     if (products.length !== productIds.length) throw new ApiError(400, "มีสินค้าบางรายการไม่พบหรือถูกปิดใช้งาน");
 
-    const [result] = await connection.execute<ResultSetHeader>(`
-      INSERT INTO order_recommendations (created_by, recommendation_date, status, note)
-      VALUES (?, CURDATE(), 'DRAFT', ?)
-    `, [createdBy, note]);
-    for (const [productId, quantity] of quantities) {
-      await connection.execute(`
-        INSERT INTO order_recommendation_items (
-          recommendation_id, product_id, suggested_quantity_base,
-          approved_quantity_base, historical_sales_qty_base
-        )
-        VALUES (?, ?, ?, NULL, 0)
-      `, [result.insertId, productId, quantity]);
+    const supplierByProduct = new Map(products.map((product) => [product.id, product.supplierId]));
+    const groupedProductIds = new Map<string, number[]>();
+    for (const productId of productIds) {
+      const supplierId = supplierByProduct.get(productId) ?? null;
+      const groupKey = splitBySupplier ? (supplierId === null ? "general" : String(supplierId)) : "all";
+      const group = groupedProductIds.get(groupKey) ?? [];
+      group.push(productId);
+      groupedProductIds.set(groupKey, group);
+    }
+
+    const recommendationIds: number[] = [];
+    for (const groupedIds of groupedProductIds.values()) {
+      const [result] = await connection.execute<ResultSetHeader>(`
+        INSERT INTO order_recommendations (created_by, recommendation_date, status, note)
+        VALUES (?, CURDATE(), 'DRAFT', ?)
+      `, [createdBy, note]);
+      recommendationIds.push(result.insertId);
+      for (const productId of groupedIds) {
+        const quantity = quantities.get(productId);
+        if (quantity === undefined) throw new ApiError(400, "ไม่พบจำนวนสินค้าที่ต้องการสั่ง");
+        await connection.execute(`
+          INSERT INTO order_recommendation_items (
+            recommendation_id, product_id, suggested_quantity_base,
+            approved_quantity_base, historical_sales_qty_base
+          )
+          VALUES (?, ?, ?, NULL, 0)
+        `, [result.insertId, productId, quantity]);
+      }
     }
 
     await connection.commit();
-    response.status(201).json({ success: true, data: { id: result.insertId } });
+    response.status(201).json({ success: true, data: { id: recommendationIds.length === 1 ? recommendationIds[0] : null, ids: recommendationIds, count: recommendationIds.length } });
   } catch (error) {
     await connection.rollback();
     throw error;
