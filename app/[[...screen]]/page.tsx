@@ -5,7 +5,6 @@ import CustomersScreen from "../_screens/CustomersScreen";
 import DashboardScreen from "../_screens/DashboardScreen";
 import EmployeesScreen from "../_screens/EmployeesScreen";
 import HistoryScreen from "../_screens/HistoryScreen";
-import InvenHistoryScreen from "../_screens/InvenHistoryScreen";
 import InventoryScreen from "../_screens/InventoryScreen";
 import InventoryOrdersScreen from "../_screens/InventoryOrdersScreen";
 import InventoryOrderCreateScreen from "../_screens/InventoryOrderCreateScreen";
@@ -16,6 +15,11 @@ import PurchaseOrderScreen from "../_screens/PurchaseOrderScreen";
 import ProductsScreen from "../_screens/ProductsScreen";
 import RecommendationsScreen from "../_screens/RecommendationsScreen";
 import SettingsScreen from "../_screens/SettingsScreen";
+import SuppliersScreen from "../_screens/SuppliersScreen"; // 🟢 Import หน้า SuppliersScreen
+import StockScreen from "../_screens/StockScreen"; // 🟢 Import หน้า StockScreen
+import CategoryScreen from "../_screens/CategoryScreen";
+import ProductManageScreen from "../_screens/ProductManageScreen";
+import AddProductScreen from "../_screens/AddProductScreen";
 
 const routeScreens: Record<string, ComponentType> = {
   customers: CustomersScreen,
@@ -31,6 +35,11 @@ const routeScreens: Record<string, ComponentType> = {
   products: ProductsScreen,
   recommendations: RecommendationsScreen,
   settings: SettingsScreen,
+  suppliers: SuppliersScreen, // 🟢 เพิ่มแมปปิ้งสำหรับ URL /suppliers
+  stock: StockScreen, // 🟢 เพิ่มแมปปิ้งสำหรับ URL /suppliers
+  categories: CategoryScreen,
+  productmanage: ProductManageScreen,
+  addproduct: AddProductScreen
 };
 
 type ScreenRouteProps = {

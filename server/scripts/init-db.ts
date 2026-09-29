@@ -43,8 +43,29 @@ async function initializeDatabase() {
     await connection.query(`CREATE DATABASE IF NOT EXISTS \`${env.database.name}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
     await connection.query(`USE \`${env.database.name}\``);
     await connection.query(schema);
+    if (!(await columnExists(connection, "categories", "is_active"))) {
+      await connection.query("ALTER TABLE categories ADD COLUMN is_active TINYINT NOT NULL DEFAULT TRUE");
+    }
+    if (!(await columnExists(connection, "sub_categories", "is_active"))) {
+      await connection.query("ALTER TABLE sub_categories ADD COLUMN is_active TINYINT NOT NULL DEFAULT TRUE");
+    }
+    if (!(await columnExists(connection, "suppliers", "line_id"))) {
+      await connection.query("ALTER TABLE suppliers ADD COLUMN line_id VARCHAR(100) NULL AFTER phone");
+    }
+    if (!(await columnExists(connection, "suppliers", "products_supplied"))) {
+      await connection.query("ALTER TABLE suppliers ADD COLUMN products_supplied TEXT NULL AFTER line_id");
+    }
     if (!(await columnExists(connection, "products", "supplier_id"))) {
       await connection.query("ALTER TABLE products ADD COLUMN supplier_id INT UNSIGNED NULL AFTER category_id");
+    }
+    if (!(await columnExists(connection, "products", "sub_category_id"))) {
+      await connection.query("ALTER TABLE products ADD COLUMN sub_category_id INT UNSIGNED NULL AFTER category_id");
+    }
+    if (!(await columnExists(connection, "products", "description"))) {
+      await connection.query("ALTER TABLE products ADD COLUMN description TEXT NULL AFTER product_name");
+    }
+    if (!(await columnExists(connection, "products", "cost_price"))) {
+      await connection.query("ALTER TABLE products ADD COLUMN cost_price DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER description");
     }
     if (!(await columnExists(connection, "products", "image_url"))) {
       await connection.query("ALTER TABLE products ADD COLUMN image_url VARCHAR(500) NULL AFTER reorder_point");

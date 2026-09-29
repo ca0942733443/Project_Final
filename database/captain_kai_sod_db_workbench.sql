@@ -71,6 +71,8 @@ CREATE TABLE IF NOT EXISTS `captain_kai_sod_db`.`suppliers` (
   `supplier_id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
   `supplier_name` VARCHAR(200) NOT NULL,
   `phone` VARCHAR(30) NULL DEFAULT NULL,
+  `line_id` VARCHAR(100) NULL DEFAULT NULL,
+  `products_supplied` TEXT NULL DEFAULT NULL,
   `address` TEXT NULL DEFAULT NULL,
   PRIMARY KEY (`supplier_id`))
 ENGINE = InnoDB;
