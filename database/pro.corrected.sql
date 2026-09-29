@@ -59,8 +59,23 @@ ENGINE = InnoDB;
 CREATE TABLE IF NOT EXISTS `captain_kai_sod_db`.`categories` (
   `category_id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
   `category_name` VARCHAR(100) NOT NULL,
+  `is_active` TINYINT NOT NULL DEFAULT TRUE,
   PRIMARY KEY (`category_id`),
   UNIQUE INDEX `category_name` (`category_name` ASC) VISIBLE)
+ENGINE = InnoDB;
+
+CREATE TABLE IF NOT EXISTS `captain_kai_sod_db`.`sub_categories` (
+  `sub_category_id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `category_id` INT UNSIGNED NOT NULL,
+  `sub_category_name` VARCHAR(100) NOT NULL,
+  `is_active` TINYINT NOT NULL DEFAULT TRUE,
+  PRIMARY KEY (`sub_category_id`),
+  INDEX `idx_sub_categories_category` (`category_id` ASC),
+  CONSTRAINT `fk_sub_categories_category`
+    FOREIGN KEY (`category_id`)
+    REFERENCES `captain_kai_sod_db`.`categories` (`category_id`)
+    ON DELETE RESTRICT
+    ON UPDATE CASCADE)
 ENGINE = InnoDB;
 
 
@@ -71,6 +86,8 @@ CREATE TABLE IF NOT EXISTS `captain_kai_sod_db`.`suppliers` (
   `supplier_id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
   `supplier_name` VARCHAR(200) NOT NULL,
   `phone` VARCHAR(30) NULL DEFAULT NULL,
+  `line_id` VARCHAR(100) NULL DEFAULT NULL,
+  `products_supplied` TEXT NULL DEFAULT NULL,
   `address` TEXT NULL DEFAULT NULL,
   PRIMARY KEY (`supplier_id`))
 ENGINE = InnoDB;
@@ -82,9 +99,12 @@ ENGINE = InnoDB;
 CREATE TABLE IF NOT EXISTS `captain_kai_sod_db`.`products` (
   `product_id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
   `category_id` INT UNSIGNED NOT NULL,
+  `sub_category_id` INT UNSIGNED NULL DEFAULT NULL,
   `supplier_id` INT UNSIGNED NULL DEFAULT NULL,
   `sku` VARCHAR(50) NOT NULL,
   `product_name` VARCHAR(200) NOT NULL,
+  `description` TEXT NULL DEFAULT NULL,
+  `cost_price` DECIMAL(12,2) NOT NULL DEFAULT 0,
   `base_unit` VARCHAR(30) NOT NULL COMMENT 'หน่วยฐานสำหรับตัดสต็อก เช่น กิโลกรัม',
   `reorder_point` DECIMAL(14,3) NOT NULL DEFAULT 0,
   `image_url` VARCHAR(500) NULL DEFAULT NULL,

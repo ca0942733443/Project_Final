@@ -13,9 +13,14 @@ interface ProductRow extends RowDataPacket {
   name: string;
   categoryId: number;
   categoryName: string;
+  subCategoryId: number | null;
+  subCategoryName: string | null;
   supplierId: number | null;
   supplierName: string | null;
   price: number;
+  costPrice: number;
+  barcode: string | null;
+  description: string | null;
   unit: string;
   stockQuantityBase: number;
   stockQuantity: number;
@@ -32,6 +37,7 @@ interface ProductForUpdate extends RowDataPacket {
   unitName: string | null;
   conversionFactor: number | null;
   sellingPrice: number | null;
+  barcode: string | null;
   imageUrl: string | null;
   imagePublicId: string | null;
 }
@@ -40,7 +46,11 @@ type ProductInput = {
   sku?: unknown;
   name?: unknown;
   categoryId?: unknown;
+  subCategoryId?: unknown;
   price?: unknown;
+  costPrice?: unknown;
+  barcode?: unknown;
+  description?: unknown;
   unit?: unknown;
   stockQuantity?: unknown;
   lowStockThreshold?: unknown;
@@ -79,6 +89,12 @@ function optionalId(value: unknown, fieldName: string) {
   return id;
 }
 
+function optionalText(value: unknown, maxLength: number) {
+  if (value === undefined || value === null || value === "") return null;
+  if (typeof value !== "string") throw new ApiError(400, "ข้อความไม่ถูกต้อง");
+  return value.trim().slice(0, maxLength) || null;
+}
+
 const productSelect = `
   SELECT
     p.product_id AS id,
@@ -86,9 +102,14 @@ const productSelect = `
     p.product_name AS name,
     p.category_id AS categoryId,
     c.category_name AS categoryName,
+    p.sub_category_id AS subCategoryId,
+    sc.sub_category_name AS subCategoryName,
     p.supplier_id AS supplierId,
     s.supplier_name AS supplierName,
     COALESCE(pu.selling_price, 0) AS price,
+    p.cost_price AS costPrice,
+    pu.barcode,
+    p.description,
     COALESCE(pu.unit_name, p.base_unit) AS unit,
     ROUND(
       COALESCE(stock.stockQuantityBase, 0) / COALESCE(NULLIF(pu.conversion_factor, 0), 1),
@@ -101,6 +122,7 @@ const productSelect = `
     p.is_active AS isActive
   FROM products p
   INNER JOIN categories c ON c.category_id = p.category_id
+  LEFT JOIN sub_categories sc ON sc.sub_category_id = p.sub_category_id
   LEFT JOIN suppliers s ON s.supplier_id = p.supplier_id
   LEFT JOIN product_units pu ON pu.product_unit_id = (
     SELECT pu2.product_unit_id
@@ -120,7 +142,11 @@ const productSelect = `
 productsRouter.get("/", asyncHandler(async (request, response) => {
   const search = typeof request.query.search === "string" ? request.query.search.trim() : "";
   const category = typeof request.query.category === "string" ? request.query.category.trim() : "";
-  const conditions = ["p.is_active = 1"];
+  const conditions = [
+    "p.is_active = 1",
+    "c.is_active = 1",
+    "(p.sub_category_id IS NULL OR sc.is_active = 1)",
+  ];
   const values: Array<string | number> = [];
 
   if (search) {
@@ -145,7 +171,10 @@ productsRouter.get("/:id", asyncHandler(async (request, response) => {
   if (!Number.isInteger(productId) || productId <= 0) throw new ApiError(400, "รหัสสินค้าไม่ถูกต้อง");
   const [products] = await pool.query<ProductRow[]>(`
     ${productSelect}
-    WHERE p.product_id = ? AND p.is_active = 1
+    WHERE p.product_id = ?
+      AND p.is_active = 1
+      AND c.is_active = 1
+      AND (p.sub_category_id IS NULL OR sc.is_active = 1)
     LIMIT 1
   `, [productId]);
   if (!products[0]) throw new ApiError(404, "ไม่พบสินค้า");
@@ -154,11 +183,25 @@ productsRouter.get("/:id", asyncHandler(async (request, response) => {
 
 productsRouter.post("/", asyncHandler(async (request, response) => {
   const body = request.body as ProductInput;
-  const sku = requiredText(body.sku, "SKU");
+
+  // 1. ตรวจสอบชื่อ/ยี่ห้อสินค้า
   const name = requiredText(body.name, "ชื่อสินค้า");
-  const selectedCategoryId = categoryId(body.categoryId);
-  const price = nonNegativeNumber(body.price, "ราคา");
-  const unit = requiredText(body.unit, "หน่วยสินค้า");
+
+  // 2. สร้าง SKU อัตโนมัติหากไม่ได้ระบุ
+  const sku = (typeof body.sku === "string" && body.sku.trim() !== "")
+    ? body.sku.trim()
+    : `SKU-${Date.now().toString().slice(-6)}${Math.floor(100 + Math.random() * 900)}`;
+
+  // 3. หมวดหมู่สินค้า
+  const selectedCategoryId = body.categoryId ? categoryId(body.categoryId) : 1;
+  const selectedSubCategoryId = optionalId(body.subCategoryId, "รหัสหมวดหมู่ย่อย");
+
+  // 4. ค่าอื่นๆ
+  const price = nonNegativeNumber(body.price, "ราคา", 0);
+  const costPrice = nonNegativeNumber(body.costPrice, "ราคาทุน", 0);
+  const barcode = optionalText(body.barcode, 100);
+  const description = optionalText(body.description, 65535);
+  const unit = (typeof body.unit === "string" && body.unit.trim() !== "") ? body.unit.trim() : "ชิ้น";
   const stockQuantity = nonNegativeNumber(body.stockQuantity, "จำนวนคงเหลือ", 0);
   const reorderPoint = nonNegativeNumber(body.lowStockThreshold, "จุดแจ้งเตือนสต็อก", 0);
   const selectedSupplierId = optionalId(body.supplierId, "รหัสผู้จำหน่าย");
@@ -169,10 +212,23 @@ productsRouter.post("/", asyncHandler(async (request, response) => {
   let committed = false;
   try {
     await connection.beginTransaction();
+
     const [categories] = await connection.query<Array<RowDataPacket & { id: number }>>(`
       SELECT category_id AS id FROM categories WHERE category_id = ? LIMIT 1 FOR UPDATE
     `, [selectedCategoryId]);
-    if (!categories[0]) throw new ApiError(404, "ไม่พบหมวดหมู่สินค้า");
+
+    let finalCategoryId = selectedCategoryId;
+    if (!categories[0]) {
+      const [firstCategory] = await connection.query<Array<RowDataPacket & { id: number }>>(`
+        SELECT category_id AS id FROM categories LIMIT 1
+      `);
+      if (firstCategory[0]) {
+        finalCategoryId = firstCategory[0].id;
+      } else {
+        throw new ApiError(404, "ไม่พบหมวดหมู่สินค้าในระบบ กรุณาเพิ่มหมวดหมู่ก่อนสร้างสินค้า");
+      }
+    }
+
     if (selectedSupplierId !== null) {
       const [suppliers] = await connection.query<Array<RowDataPacket & { id: number }>>(`
         SELECT supplier_id AS id FROM suppliers WHERE supplier_id = ? LIMIT 1 FOR UPDATE
@@ -182,26 +238,31 @@ productsRouter.post("/", asyncHandler(async (request, response) => {
 
     const [result] = await connection.execute<ResultSetHeader>(`
       INSERT INTO products (
-        category_id, supplier_id, sku, product_name, base_unit, reorder_point,
+        category_id, sub_category_id, supplier_id, sku, product_name, description, cost_price, base_unit, reorder_point,
         image_url, image_public_id, is_active
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
     `, [
-      selectedCategoryId,
+      finalCategoryId,
+      selectedSubCategoryId,
       selectedSupplierId,
       sku,
       name,
+      description,
+      costPrice,
       unit,
       reorderPoint,
       image?.url ?? null,
       image?.publicId ?? null,
     ]);
+
     const [unitResult] = await connection.execute<ResultSetHeader>(`
       INSERT INTO product_units (
-        product_id, unit_name, conversion_factor, selling_price, is_default, is_active
+        product_id, unit_name, conversion_factor, selling_price, barcode, is_default, is_active
       )
-      VALUES (?, ?, 1, ?, 1, 1)
-    `, [result.insertId, unit, price]);
+      VALUES (?, ?, 1, ?, ?, 1, 1)
+    `, [result.insertId, unit, price, barcode]);
+
     if (stockQuantity > 0) {
       await receiveStock(connection, {
         productId: result.insertId,
@@ -211,6 +272,7 @@ productsRouter.post("/", asyncHandler(async (request, response) => {
         supplierId: selectedSupplierId,
       });
     }
+
     await connection.commit();
     committed = true;
     response.status(201).json({
@@ -226,6 +288,7 @@ productsRouter.post("/", asyncHandler(async (request, response) => {
   }
 }));
 
+// 🟢 แก้ไขสินค้า
 productsRouter.patch("/:id", asyncHandler(async (request, response) => {
   const productId = Number(request.params.id);
   if (!Number.isInteger(productId) || productId <= 0) throw new ApiError(400, "รหัสสินค้าไม่ถูกต้อง");
@@ -246,6 +309,7 @@ productsRouter.patch("/:id", asyncHandler(async (request, response) => {
         pu.unit_name AS unitName,
         pu.conversion_factor AS conversionFactor,
         pu.selling_price AS sellingPrice,
+        pu.barcode,
         p.image_url AS imageUrl,
         p.image_public_id AS imagePublicId
       FROM products p
@@ -269,9 +333,13 @@ productsRouter.patch("/:id", asyncHandler(async (request, response) => {
       productUpdates.push(`${column} = ?`);
       productValues.push(value);
     };
+
     if (body.sku !== undefined) setProduct("sku", requiredText(body.sku, "SKU"));
     if (body.name !== undefined) setProduct("product_name", requiredText(body.name, "ชื่อสินค้า"));
     if (body.categoryId !== undefined) setProduct("category_id", categoryId(body.categoryId));
+    if (body.subCategoryId !== undefined) setProduct("sub_category_id", optionalId(body.subCategoryId, "รหัสหมวดหมู่ย่อย"));
+    if (body.description !== undefined) setProduct("description", optionalText(body.description, 65535));
+    if (body.costPrice !== undefined) setProduct("cost_price", nonNegativeNumber(body.costPrice, "ราคาทุน"));
     if (body.supplierId !== undefined) {
       const selectedSupplierId = optionalId(body.supplierId, "รหัสผู้จำหน่าย");
       if (selectedSupplierId !== null) {
@@ -292,6 +360,7 @@ productsRouter.patch("/:id", asyncHandler(async (request, response) => {
       setProduct("image_url", newImage?.url ?? null);
       setProduct("image_public_id", newImage?.publicId ?? null);
     }
+
     if (productUpdates.length) {
       productValues.push(productId);
       await connection.execute(`
@@ -303,21 +372,22 @@ productsRouter.patch("/:id", asyncHandler(async (request, response) => {
     const requestedPrice = body.price !== undefined
       ? nonNegativeNumber(body.price, "ราคา")
       : Number(product.sellingPrice ?? 0);
+    const requestedBarcode = body.barcode !== undefined ? optionalText(body.barcode, 100) : product.barcode;
     let productUnitId = product.productUnitId;
     const conversionFactor = Number(product.conversionFactor ?? 1);
     if (!productUnitId) {
       const [unitResult] = await connection.execute<ResultSetHeader>(`
         INSERT INTO product_units (
-          product_id, unit_name, conversion_factor, selling_price, is_default, is_active
+          product_id, unit_name, conversion_factor, selling_price, barcode, is_default, is_active
         )
-        VALUES (?, ?, 1, ?, 1, 1)
-      `, [productId, requestedUnit, requestedPrice]);
+        VALUES (?, ?, 1, ?, ?, 1, 1)
+      `, [productId, requestedUnit, requestedPrice, requestedBarcode]);
       productUnitId = unitResult.insertId;
-    } else if (body.unit !== undefined || body.price !== undefined) {
+    } else if (body.unit !== undefined || body.price !== undefined || body.barcode !== undefined) {
       await connection.execute(`
-        UPDATE product_units SET unit_name = ?, selling_price = ?
+        UPDATE product_units SET unit_name = ?, selling_price = ?, barcode = ?
         WHERE product_unit_id = ?
-      `, [requestedUnit, requestedPrice, productUnitId]);
+      `, [requestedUnit, requestedPrice, requestedBarcode, productUnitId]);
     }
 
     if (body.stockQuantity !== undefined) {
