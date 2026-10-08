@@ -13,8 +13,10 @@ import {
   Search,
   Settings,
   Store,
+  Truck,
   Users,
   WalletCards,
+  Warehouse,
   X,
 } from "lucide-react";
 import Link from "next/link";
@@ -26,6 +28,8 @@ export type AdminSection =
   | "dashboard"
   | "pos"
   | "products"
+  | "suppliers"
+  | "stock" // 🟢 เพิ่มประเภท stock
   | "inventory"
   | "inventory-orders"
   | "recommendations"
@@ -33,12 +37,17 @@ export type AdminSection =
   | "employees"
   | "settings"
   | "history"
-  | "notifications";
+  | "notifications"
+  | "categories"
+  | "productmanage"
+  | "addproduct";
 
 const navigation = [
   ["dashboard", "แดชบอร์ดสรุปรายได้", LayoutDashboard, "/"],
   ["pos", "หน้าจอขายหน้าร้าน", Store, "/pos"],
   ["products", "จัดการสินค้า", PackagePlus, "/products"],
+  ["suppliers", "จัดการ Supplier", Truck, "/suppliers"],
+  ["stock", "จัดการสต็อก", Warehouse, "/stock"], // 🟢 เพิ่มเมนู "จัดการสต็อก" ตรงนี้
   ["inventory", "คลังสินค้า & สต็อกสินค้า", Boxes, "/inventory"],
   ["inventory-orders", "คำสั่งซื้อสินค้าคงคลัง", ClipboardList, "/inventory-orders"],
   ["recommendations", "ระบบแนะนำการสั่งซื้อ", Lightbulb, "/recommendations"],
@@ -77,7 +86,16 @@ export default function AdminShell({
     window.location.assign("/login");
   };
 
-  const profileButton = <button className="profile" onClick={logout} title="ออกจากระบบ" type="button"><div className="avatar">{user?.fullName.charAt(0) ?? "ก"}</div><div><strong>{user?.fullName ?? "กัปตันอูด้ง"}</strong><span>{roleLabel}</span></div><ChevronDown size={14} /></button>;
+  const profileButton = (
+    <button className="profile" onClick={logout} title="ออกจากระบบ" type="button">
+      <div className="avatar">{user?.fullName.charAt(0) ?? "ก"}</div>
+      <div>
+        <strong>{user?.fullName ?? "กัปตันอูด้ง"}</strong>
+        <span>{roleLabel}</span>
+      </div>
+      <ChevronDown size={14} />
+    </button>
+  );
 
   return (
     <div className="app-shell">

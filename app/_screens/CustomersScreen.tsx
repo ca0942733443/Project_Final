@@ -1,9 +1,11 @@
 "use client";
 
-import { Download, Pencil, Trash2, UserPlus, X } from "lucide-react";
+import { Download, Eye, Pencil, Trash2, UserPlus, X } from "lucide-react";
+import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import AdminShell from "../_components/AdminShell";
 import { PageTitle, Stat } from "../_components/PageElements";
+import TableActionMenu from "../_components/TableActionMenu";
 import { apiFetch, errorMessage } from "../_lib/api";
 
 type Customer = {
@@ -17,6 +19,7 @@ type Customer = {
   carTypeName: string | null;
   creditLimit: number;
   balanceDue: number;
+  overdueBalance: number;
   orderCount: number;
   totalSpent: number;
   favoriteProduct: string | null;
@@ -32,7 +35,6 @@ type CustomerStats = {
   activeCustomers: number;
   customersWithDebt: number;
   totalBalanceDue: number;
-  creditSalesThisMonth: number;
 };
 
 function memberLevel(totalSpent: number) {
@@ -122,7 +124,7 @@ export default function CustomersScreen() {
   };
 
   const removeCustomer = async (customer: Customer) => {
-    if (!window.confirm(`ปิดใช้งานลูกค้า ${customer.fullName} หรือไม่? ประวัติการขายเชื่อจะยังคงอยู่`)) return;
+    if (!window.confirm(`ปิดใช้งานลูกค้า ${customer.fullName} หรือไม่? ประวัติการซื้อและการขายเชื่อจะยังคงอยู่`)) return;
     setDeletingId(customer.id);
     setError("");
     try {
@@ -137,7 +139,7 @@ export default function CustomersScreen() {
 
   const exportCsv = () => {
     const rows = [
-      ["รหัสลูกค้า", "ชื่อ-นามสกุล", "โทรศัพท์", "ทะเบียนรถ", "สถานที่", "ประเภทรถ", "วงเงินเครดิต", "ยอดค้างชำระ"],
+      ["รหัสลูกค้า", "ชื่อ-นามสกุล", "โทรศัพท์", "ทะเบียนรถ", "สถานที่", "ประเภทรถ", "วงเงินขายเชื่อ", "จำนวนบิล", "ยอดซื้อสะสม"],
       ...customers.map((customer) => [
         customer.customerCode,
         customer.fullName,
@@ -146,7 +148,8 @@ export default function CustomersScreen() {
         customer.location,
         customer.carTypeName ?? "",
         customer.creditLimit,
-        customer.balanceDue,
+        customer.orderCount,
+        customer.totalSpent,
       ]),
     ];
     const csv = rows.map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(",")).join("\n");
@@ -158,43 +161,39 @@ export default function CustomersScreen() {
     URL.revokeObjectURL(url);
   };
 
+  const totalOrders = customers.reduce((sum, customer) => sum + Number(customer.orderCount), 0);
+
   return <AdminShell active="customers">
     <PageTitle
-      title="ระบบบัญชีขายเชื่อ"
-      subtitle={`ข้อมูลอัปเดต: ${new Date().toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" })}`}
+      title="ลูกค้าและบัญชีขายเชื่อ"
+      subtitle="เลือกลูกค้าเพื่อดูข้อมูล วงเงิน บิลขายเชื่อ และสินค้าที่ซื้อในแต่ละบิล"
       action={<div className="product-page-actions"><button className="secondary-button" onClick={exportCsv} type="button"><Download size={16} /> ส่งออก CSV</button><button className="primary-button" onClick={openCreateForm} type="button"><UserPlus size={17} /> เพิ่มลูกค้า</button></div>}
     />
     <div className="stat-grid four">
       <Stat label="ลูกค้าทั้งหมด" value={`${stats?.totalCustomers ?? 0} ราย`} />
       <Stat label="ลูกค้าที่มีหนี้" value={`${stats?.customersWithDebt ?? 0} ราย`} tone="orange" />
-      <Stat label="ยอดค้างชำระรวม" value={`฿${money(stats?.totalBalanceDue ?? 0)}`} tone="neutral" />
-      <Stat label="ขายเชื่อเดือนนี้" value={`฿${money(stats?.creditSalesThisMonth ?? 0)}`} />
+      <Stat label="ยอดค้างรวม" value={`฿${money(stats?.totalBalanceDue ?? 0)}`} tone="orange" />
+      <Stat label="จำนวนบิลทั้งหมด" value={`${totalOrders.toLocaleString("th-TH")} บิล`} tone="neutral" />
     </div>
     {loading && <div className="api-message">กำลังโหลดข้อมูลลูกค้า...</div>}
     {error && <div className="api-message error">{error}</div>}
     <section className="data-card credit-card">
-      <div className="table-wrap"><table><thead><tr>{["ชื่อลูกค้า", "เบอร์โทรศัพท์", "ทะเบียนรถ", "สถานที่", "ประเภทรถ", "วงเงินเครดิต", "ยอดค้างชำระ", "ระดับสมาชิก", "จัดการ"].map(title => <th key={title}>{title}</th>)}</tr></thead><tbody>
-        {customers.map((customer) => {
-          const creditLimit = Number(customer.creditLimit);
-          const balanceDue = Number(customer.balanceDue);
-          const isOver = creditLimit > 0 && balanceDue >= creditLimit;
-          const isDue = creditLimit > 0 && balanceDue > creditLimit * .6;
-          return <tr key={customer.id}>
-            <td><div className="person"><span>{customer.fullName.charAt(0)}</span><div><strong>{customer.fullName}</strong><small>{customer.customerCode}</small></div></div></td>
-            <td>{customer.phone ?? "–"}</td>
-            <td>{customer.carPlate ?? "–"}</td>
-            <td>{customer.location}</td>
-            <td>{customer.carTypeName ?? "–"}</td>
-            <td>฿{money(creditLimit)}</td>
-            <td className={isDue ? "danger-text" : ""}><strong>฿{money(balanceDue)}</strong>{isOver && <small className="danger-text"> เกินวงเงิน</small>}</td>
-            <td><span className="soft-tag">{memberLevel(Number(customer.totalSpent))}</span></td>
-            <td><div className="customer-actions"><button aria-label={`แก้ไข ${customer.fullName}`} className="tiny-button" onClick={() => openEditForm(customer)} type="button"><Pencil size={14} /></button><button aria-label={`ลบ ${customer.fullName}`} className="tiny-button danger-button" disabled={deletingId === customer.id} onClick={() => void removeCustomer(customer)} type="button"><Trash2 size={14} /></button></div></td>
-          </tr>;
-        })}
-        {!loading && customers.length === 0 && <tr><td className="empty-cell" colSpan={9}>ยังไม่มีลูกค้าประจำในระบบ</td></tr>}
+      <div className="table-wrap"><table><thead><tr>{["ลูกค้า", "เบอร์โทรศัพท์", "ทะเบียนรถ", "วงเงินขายเชื่อ", "ยอดค้าง", "เกินกำหนด", "ระดับสมาชิก", "ยอดซื้อสะสม", "จัดการ"].map(title => <th key={title}>{title}</th>)}</tr></thead><tbody>
+        {customers.map((customer) => <tr key={customer.id}>
+          <td><div className="person"><span>{customer.fullName.charAt(0)}</span><div><strong>{customer.fullName}</strong><small>{customer.customerCode}</small></div></div></td>
+          <td>{customer.phone ?? "–"}</td>
+          <td>{customer.carPlate ?? "–"}</td>
+          <td>฿{money(customer.creditLimit)}</td>
+          <td><strong className={Number(customer.balanceDue) > 0 ? "danger-text" : ""}>฿{money(customer.balanceDue)}</strong></td>
+          <td className={Number(customer.overdueBalance) > 0 ? "danger-text" : ""}>฿{money(customer.overdueBalance)}</td>
+          <td><span className="soft-tag">{memberLevel(Number(customer.totalSpent))}</span></td>
+          <td>฿{money(customer.totalSpent)}</td>
+          <td><TableActionMenu label={`จัดการลูกค้า ${customer.fullName}`}><Link className="table-action-menu-item" href={`/customer-credit?id=${customer.id}`} role="menuitem"><Eye size={15} /> ดูข้อมูลและบิลขายเชื่อ</Link><button className="table-action-menu-item" onClick={() => openEditForm(customer)} role="menuitem" type="button"><Pencil size={15} /> แก้ไขข้อมูล</button><button className="table-action-menu-item danger" disabled={deletingId === customer.id} onClick={() => void removeCustomer(customer)} role="menuitem" type="button"><Trash2 size={15} /> ลบลูกค้า</button></TableActionMenu></td>
+        </tr>)}
+        {!loading && customers.length === 0 && <tr><td className="empty-cell" colSpan={9}>ยังไม่มีลูกค้าในระบบ</td></tr>}
       </tbody></table></div>
       <div className="recommendation-pagination"><span>แสดงลูกค้าที่ใช้งานอยู่ทั้งหมด {customers.length} รายการ</span></div>
     </section>
-    {showForm && <div className="modal-backdrop"><form key={editingCustomer?.id ?? "new"} className="modal customer-form-modal" onSubmit={saveCustomer}><button type="button" className="modal-close" onClick={closeForm}><X /></button><h2>{editingCustomer ? "แก้ไขข้อมูลลูกค้า" : "เพิ่มลูกค้าใหม่"}</h2><p className="modal-description">ข้อมูลจะถูกบันทึกให้ตรงกับตาราง Customers โดยตรง ส่วนยอดค้างชำระจะเกิดจากใบแจ้งหนี้ขายเชื่อเท่านั้น</p><div className="product-form-grid"><label className="wide">ชื่อ-นามสกุล<input defaultValue={editingCustomer?.fullName ?? ""} name="fullName" required /></label><label>เบอร์โทรศัพท์<input defaultValue={editingCustomer?.phone ?? ""} name="phone" type="tel" /></label><label>ทะเบียนรถ<input defaultValue={editingCustomer?.carPlate ?? ""} name="carPlate" /></label><label>สถานที่<input defaultValue={editingCustomer?.location ?? ""} name="location" required /></label><label>ประเภทรถ<select defaultValue={editingCustomer?.carTypeId ? String(editingCustomer.carTypeId) : ""} name="carTypeId"><option value="">ไม่ระบุ</option>{options.carTypes.map((option) => <option key={option.id} value={option.id}>{option.name ?? `#${option.id}`}</option>)}</select></label><label>วงเงินเครดิต<input defaultValue={editingCustomer?.creditLimit ?? 0} min="0" name="creditLimit" step="0.01" type="number" /></label></div><div className="product-form-actions"><button onClick={closeForm} type="button">ยกเลิก</button><button className="primary-button" disabled={saving} type="submit">{saving ? "กำลังบันทึก..." : editingCustomer ? "บันทึกการแก้ไข" : "บันทึกลูกค้า"}</button></div></form></div>}
+    {showForm && <div className="modal-backdrop"><form key={editingCustomer?.id ?? "new"} className="modal customer-form-modal" onSubmit={saveCustomer}><button type="button" className="modal-close" onClick={closeForm}><X /></button><h2>{editingCustomer ? "แก้ไขข้อมูลลูกค้า" : "เพิ่มลูกค้าใหม่"}</h2><p className="modal-description">ข้อมูลทั่วไปและวงเงินขายเชื่อของลูกค้า ส่วนรายการบิลและการรับชำระจัดการได้ที่หน้าบัญชีขายเชื่อ</p><div className="product-form-grid"><label className="wide">ชื่อ-นามสกุล<input defaultValue={editingCustomer?.fullName ?? ""} name="fullName" required /></label><label>เบอร์โทรศัพท์<input defaultValue={editingCustomer?.phone ?? ""} name="phone" type="tel" /></label><label>ทะเบียนรถ<input defaultValue={editingCustomer?.carPlate ?? ""} name="carPlate" /></label><label>สถานที่<input defaultValue={editingCustomer?.location ?? ""} name="location" required /></label><label>ประเภทรถ<select defaultValue={editingCustomer?.carTypeId ? String(editingCustomer.carTypeId) : ""} name="carTypeId"><option value="">ไม่ระบุ</option>{options.carTypes.map((option) => <option key={option.id} value={option.id}>{option.name ?? `#${option.id}`}</option>)}</select></label><label>วงเงินขายเชื่อ<input defaultValue={editingCustomer?.creditLimit ?? 0} min="0" name="creditLimit" step="0.01" type="number" /></label></div><div className="product-form-actions"><button onClick={closeForm} type="button">ยกเลิก</button><button className="primary-button" disabled={saving} type="submit">{saving ? "กำลังบันทึก..." : editingCustomer ? "บันทึกการแก้ไข" : "บันทึกลูกค้า"}</button></div></form></div>}
   </AdminShell>;
 }

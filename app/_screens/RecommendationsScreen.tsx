@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import AdminShell from "../_components/AdminShell";
 import { PageTitle } from "../_components/PageElements";
+import TableActionMenu from "../_components/TableActionMenu";
 import { apiFetch, errorMessage } from "../_lib/api";
 
 type SalesRecommendation = {
@@ -220,7 +221,7 @@ export default function RecommendationsScreen() {
             <td><div className="stock-level"><span>{numberText(item.currentStock)} {item.unit}</span><b>{Math.round(stockRatio)}%</b><i><em style={{ width: `${stockRatio}%` }} /></i></div></td>
             <td>{numberText(item.targetStock)} {item.unit}</td>
             <td className="suggested-qty">{item.suggestedQuantity > 0 ? `+ ${numberText(item.suggestedQuantity)} ${item.unit}` : "ไม่ต้องเติม"}</td>
-            <td><button className="row-action" disabled={item.suggestedQuantity <= 0} onClick={() => toggleHeldOrderItem(item)} type="button">{isHeld ? <><Check size={14} /> พักไว้แล้ว</> : <><PackagePlus size={14} /> พักรายการ</>}</button></td>
+            <td><TableActionMenu label={`จัดการสินค้า ${item.productName}`}><button className="table-action-menu-item" disabled={item.suggestedQuantity <= 0} onClick={() => toggleHeldOrderItem(item)} role="menuitem" type="button">{isHeld ? <><Check size={15} /> นำออกจากรายการพัก</> : <><PackagePlus size={15} /> พักรายการสั่งซื้อ</>}</button></TableActionMenu></td>
           </tr>;
         })}
         {!loading && sales.length === 0 && <tr><td className="empty-cell" colSpan={8}>ยังไม่มียอดขายในช่วง 7 วันล่าสุด หรือไม่มีสินค้าที่ถึงจุดสั่งซื้อ</td></tr>}
@@ -234,7 +235,7 @@ export default function RecommendationsScreen() {
             <td><div className="customer-recommendation-products">{customer.products.length ? customer.products.map((product) => <span key={product.productId}>{product.productName}<small>{numberText(product.quantityPurchased)} {product.unit}</small></span>) : <span>ยังไม่มีรายละเอียดสินค้า</span>}</div></td>
             <td>{customer.phone ?? "–"}</td>
             <td>{customer.carPlate ?? "–"}</td>
-            <td><button className="row-action" onClick={() => setPreparedCustomerIds((current) => isPrepared ? current.filter((id) => id !== customer.customerId) : [...current, customer.customerId])} type="button">{isPrepared ? <><Check size={14} /> เตรียมแล้ว</> : "เตรียมของ"}</button></td>
+            <td><TableActionMenu label={`จัดการรายการแนะนำของ ${customer.fullName}`}><button className="table-action-menu-item" onClick={() => setPreparedCustomerIds((current) => isPrepared ? current.filter((id) => id !== customer.customerId) : [...current, customer.customerId])} role="menuitem" type="button">{isPrepared ? <><Check size={15} /> ยกเลิกเตรียมสินค้า</> : <><PackagePlus size={15} /> เตรียมสินค้า</>}</button></TableActionMenu></td>
           </tr>;
         })}
         {!loading && customers.length === 0 && <tr><td className="empty-cell" colSpan={7}>ยังไม่มีลูกค้าที่ไม่ซื้อซ้ำตามจำนวนวันที่เลือก</td></tr>}
