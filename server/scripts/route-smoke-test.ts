@@ -15,6 +15,11 @@ const barcode = `ROUTE-BAR-${marker}`.toUpperCase();
 const phone = `09${String(Date.now()).slice(-8)}`;
 const employeeEmail = `route-test-${marker}@example.com`;
 const inventoryOrderNote = `route-test-order-${marker}`;
+const receiptNo = `GR-TEST-${marker}`.toUpperCase();
+const lotNo = `LOT-TEST-${marker}`.toUpperCase();
+const localNow = new Date(Date.now() - new Date().getTimezoneOffset() * 60_000);
+const receivedAt = localNow.toISOString().slice(0, 16);
+const expiryDate = new Date(localNow.getTime() + 30 * 86_400_000).toISOString().slice(0, 10);
 
 type ApiEnvelope<T> = { success: boolean; data: T };
 
@@ -254,10 +259,61 @@ async function run() {
     });
     const inventoryOrderList = await api<{ items: Array<{ id: number }> }>(`/inventory-orders?search=${encodeURIComponent(inventoryOrderNote)}`, token);
     if (!inventoryOrderList.items.some((order) => order.id === inventoryOrder.id)) throw new Error("Inventory order was not returned by search");
-    const inventoryOrderDetail = await api<{ items: Array<{ productId: number }> }>(`/inventory-orders/${inventoryOrder.id}`, token);
-    if (!inventoryOrderDetail.items.some((item) => item.productId === product.id)) throw new Error("Inventory order detail is missing its product");
+    const inventoryOrderDetail = await api<{ items: Array<{ id: number; productId: number; currentStock: number }> }>(`/inventory-orders/${inventoryOrder.id}`, token);
+    const inventoryOrderItem = inventoryOrderDetail.items.find((item) => item.productId === product.id);
+    if (!inventoryOrderItem) throw new Error("Inventory order detail is missing its product");
     await api(`/inventory-orders/${inventoryOrder.id}`, token, { method: "PATCH", body: JSON.stringify({ status: "PENDING_APPROVAL" }) });
     await api(`/inventory-orders/${inventoryOrder.id}`, token, { method: "PATCH", body: JSON.stringify({ status: "APPROVED" }) });
+    const receivedOrder = await api<{ status: string; receiptNo: string; totalQuantity: number }>(`/inventory-orders/${inventoryOrder.id}/receive`, token, {
+      method: "POST",
+      body: JSON.stringify({
+        receiptNo,
+        receivedAt,
+        items: [{ itemId: inventoryOrderItem.id, quantity: 4, unitCost: 42, lotNo, expiryDate }],
+      }),
+    });
+    if (receivedOrder.status !== "RECEIVED" || receivedOrder.receiptNo !== receiptNo || receivedOrder.totalQuantity !== 4) {
+      throw new Error("Inventory order receipt did not return the expected result");
+    }
+    const receivedOrderDetail = await api<{
+      status: string;
+      receiptNo: string | null;
+      items: Array<{
+        productId: number;
+        currentStock: number;
+        receivedQuantity: number | null;
+        receivedUnitCost: number | null;
+        lotNo: string | null;
+        expiryDate: string | null;
+      }>;
+    }>(`/inventory-orders/${inventoryOrder.id}`, token);
+    const receivedOrderItem = receivedOrderDetail.items.find((item) => item.productId === product.id);
+    if (
+      receivedOrderDetail.status !== "RECEIVED"
+      || receivedOrderDetail.receiptNo !== receivedOrder.receiptNo
+      || !receivedOrderItem
+      || receivedOrderItem.receivedQuantity !== 4
+      || receivedOrderItem.receivedUnitCost !== 42
+      || receivedOrderItem.lotNo !== lotNo
+      || receivedOrderItem.expiryDate !== expiryDate
+      || receivedOrderItem.currentStock !== inventoryOrderItem.currentStock + 4
+    ) {
+      throw new Error("PO receipt did not persist its receipt, cost, quantity, or stock movement");
+    }
+    let duplicateReceiptRejected = false;
+    try {
+      await api(`/inventory-orders/${inventoryOrder.id}/receive`, token, {
+        method: "POST",
+        body: JSON.stringify({
+          receiptNo,
+          receivedAt,
+          items: [{ itemId: inventoryOrderItem.id, quantity: 4, unitCost: 42, lotNo, expiryDate }],
+        }),
+      });
+    } catch (receiptError) {
+      if (receiptError instanceof Error && receiptError.message.includes("รับสินค้าเข้าสต็อกแล้ว")) duplicateReceiptRejected = true;
+    }
+    if (!duplicateReceiptRejected) throw new Error("Duplicate PO receipt was not rejected");
 
     const cashSale = await api<{ orderNumber: string; total: number; amountReceived: number; changeAmount: number; paymentMethod: "cash" | "qr" }>("/orders", token, {
       method: "POST",
@@ -348,7 +404,7 @@ async function run() {
         "suppliers GET/POST/PUT/detail",
         "products POST/GET/PATCH/DELETE",
         "inventory GET/POST",
-        "inventory-orders GET/POST/PATCH/detail",
+        "inventory-orders GET/POST/PATCH/detail/receive and duplicate-receipt protection",
         "orders cash/qr POST/GET and credit rejection",
         "dashboard/recommendations inactive-customer logic/categories read routes",
       ],
