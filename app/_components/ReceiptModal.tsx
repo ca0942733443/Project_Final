@@ -25,7 +25,7 @@ export default function ReceiptModal({ receipt, success = false, onClose }: { re
         <div className="receipt-meta"><span>เลขที่อ้างอิง: #{receipt.orderNumber}</span><span>{new Date(receipt.createdAt).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" })}</span></div>
         <div className="receipt-items">{receipt.items.map((item, index) => <div className="receipt-item" key={`${item.productName}-${index}`}><span>{item.productName}<small>x{item.quantity}</small></span><strong>฿{item.lineTotal.toFixed(2)}</strong></div>)}</div>
         <div className="receipt-summary"><span>ยอดรวมสินค้า (Subtotal)<b>฿{receipt.subtotal.toFixed(2)}</b></span><span>ส่วนลด<b>฿0.00</b></span><strong>รวมทั้งสิ้น (Total)<b>฿{receipt.total.toFixed(2)}</b></strong></div>
-        <div className="receipt-payment"><span>ช่องทางการชำระ:<b>{paymentLabels[receipt.paymentMethod]}</b></span><span>รับเงินมา:<b>฿{receipt.amountReceived.toFixed(2)}</b></span><span>เงินทอน:<b>฿{receipt.changeAmount.toFixed(2)}</b></span></div>
+        <div className="receipt-payment"><span>ช่องทางการชำระ:<b>{paymentLabels[receipt.paymentMethod]}</b></span>{receipt.paymentMethod === "credit" ? <><span>สถานะ:<b>ยังไม่ชำระ</b></span><span>ยอดค้างชำระ:<b>฿{receipt.total.toFixed(2)}</b></span></> : <><span>รับเงินมา:<b>฿{receipt.amountReceived.toFixed(2)}</b></span><span>เงินทอน:<b>฿{receipt.changeAmount.toFixed(2)}</b></span></>}</div>
         <p className="receipt-points">ได้รับคะแนนสะสม +68 คะแนน (ยอดรวม: 1,420 คะแนน)</p>
         <div className="receipt-buttons">{success && <button onClick={onClose}>เสร็จสิ้น</button>}<button className="receipt-print" onClick={() => window.print()}><Printer size={19}/> พิมพ์ใบเสร็จ</button></div>
       </div>

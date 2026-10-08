@@ -11,7 +11,7 @@ type Order = {
   id: number;
   orderNumber: string;
   total: number;
-  status: "paid" | "cancelled";
+  status: "paid" | "credit" | "cancelled";
   paymentMethod: "cash" | "qr" | "credit" | null;
   customerName: string | null;
   employeeName: string | null;
@@ -20,7 +20,7 @@ type Order = {
 
 type OrdersData = { items: Order[]; summary: { totalSales: number; orderCount: number } };
 const methodLabels = { cash: "เงินสด", qr: "QR PromptPay", credit: "ขายเชื่อ" } as const;
-const statusLabels = { paid: "สำเร็จ", cancelled: "ยกเลิก" } as const;
+const statusLabels = { paid: "สำเร็จ", credit: "ขายเชื่อ", cancelled: "ยกเลิก" } as const;
 type SortKey = "orderNumber" | "createdAt" | "total" | "paymentMethod" | "status";
 type SortDirection = "asc" | "desc";
 type OrderFilters = { dateFrom: string; dateTo: string; paymentMethod: string; orderStatus: string };
@@ -118,7 +118,7 @@ export default function HistoryScreen() {
     <section className="data-card history-card">
       {loading && <div className="api-message">กำลังโหลดประวัติการขาย...</div>}
       {error && <div className="api-message error">{error}</div>}
-      <div className="table-wrap"><table><thead><tr>{sortableColumns.map(({ key, label }) => <th key={key} aria-sort={sortKey === key ? sortDirection === "asc" ? "ascending" : "descending" : "none"}><button type="button" className="sort-button" title={`เรียงตาม${label}`} aria-label={`เรียงตาม${label}${sortKey === key ? (sortDirection === "asc" ? " จากน้อยไปมาก" : "จากมากไปน้อย") : ""}`} onClick={() => sortOrders(key)}>{label}{sortKey === key ? (sortDirection === "asc" ? <ArrowUp size={14} aria-hidden="true" /> : <ArrowDown size={14} aria-hidden="true" />) : <ArrowDownUp size={14} aria-hidden="true" />}</button></th>)}<th aria-label="การจัดการ" /></tr></thead><tbody>{sortedOrders.slice(0, 4).map(order => <tr key={order.id}><td>{order.orderNumber}</td><td>{new Date(order.createdAt).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}</td><td>฿{order.total.toLocaleString("th-TH", { minimumFractionDigits: 2 })}</td><td>{order.paymentMethod ? methodLabels[order.paymentMethod] : "–"}</td><td><span className={order.status === "paid" ? "success-pill" : "status-pill s-2"}>● {statusLabels[order.status]}</span></td><td><button type="button" className="tiny-button" aria-label={`เปิดใบเสร็จ ${order.orderNumber}`} onClick={() => void openReceipt(order)}><Printer size={17} /></button></td></tr>)}</tbody></table></div>
+      <div className="table-wrap"><table><thead><tr>{sortableColumns.map(({ key, label }) => <th key={key} aria-sort={sortKey === key ? sortDirection === "asc" ? "ascending" : "descending" : "none"}><button type="button" className="sort-button" title={`เรียงตาม${label}`} aria-label={`เรียงตาม${label}${sortKey === key ? (sortDirection === "asc" ? " จากน้อยไปมาก" : "จากมากไปน้อย") : ""}`} onClick={() => sortOrders(key)}>{label}{sortKey === key ? (sortDirection === "asc" ? <ArrowUp size={14} aria-hidden="true" /> : <ArrowDown size={14} aria-hidden="true" />) : <ArrowDownUp size={14} aria-hidden="true" />}</button></th>)}<th aria-label="การจัดการ" /></tr></thead><tbody>{sortedOrders.slice(0, 4).map(order => <tr key={order.id}><td>{order.orderNumber}</td><td>{new Date(order.createdAt).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}</td><td>฿{order.total.toLocaleString("th-TH", { minimumFractionDigits: 2 })}</td><td>{order.paymentMethod ? methodLabels[order.paymentMethod] : "–"}</td><td><span className={order.status === "paid" ? "success-pill" : order.status === "credit" ? "status-pill s-3" : "status-pill s-2"}>● {statusLabels[order.status]}</span></td><td><button type="button" className="tiny-button" aria-label={`เปิดใบเสร็จ ${order.orderNumber}`} onClick={() => void openReceipt(order)}><Printer size={17} /></button></td></tr>)}</tbody></table></div>
       {!loading && data?.items.length === 0 && <div className="api-message">ไม่พบรายการขายในช่วงที่เลือก</div>}
       <div className="pagination"><span>แสดง {data?.items.length ? 1 : 0}-{Math.min(4, data?.items.length ?? 0)} จาก {data?.summary.orderCount ?? 0} รายการ</span><div><button aria-label="หน้าก่อนหน้า"><ChevronLeft size={17}/></button><button className="selected" aria-current="page">1</button><button>2</button><button>3</button><button aria-label="หน้าถัดไป"><ChevronRight size={17}/></button></div></div>
     </section>

@@ -17,6 +17,7 @@ import { ApiError } from "./utils/api-error";
 import { authRouter } from "./routes/auth";
 import { recommendationsRouter } from "./routes/recommendations";
 import { requireAuthentication } from "./middleware/auth";
+import { creditInvoicesRouter } from "./routes/credit-invoices";
 
 export const app = express();
 
@@ -38,6 +39,7 @@ app.use("/api/auth", authRouter);
 app.use("/api", requireAuthentication);
 app.use("/api/categories", categoriesRouter);
 app.use("/api/customers", customersRouter);
+app.use("/api/credit-invoices", creditInvoicesRouter);
 app.use("/api/dashboard", dashboardRouter);
 app.use("/api/employees", employeesRouter);
 app.use("/api/inventory", inventoryRouter);
