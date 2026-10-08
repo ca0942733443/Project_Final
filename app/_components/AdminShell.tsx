@@ -59,10 +59,12 @@ export default function AdminShell({
   active,
   children,
   contentClassName = "",
+  shellClassName = "",
 }: {
   active: AdminSection;
   children: React.ReactNode;
   contentClassName?: string;
+  shellClassName?: string;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [user, setUser] = useState<{ fullName: string; role: "owner" | "cashier" | "stock" } | null>(null);
@@ -98,7 +100,7 @@ export default function AdminShell({
   );
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${shellClassName}`}>
       {menuOpen && <button className="backdrop" onClick={() => setMenuOpen(false)} aria-label="ปิดเมนู" />}
       <aside className={`sidebar ${menuOpen ? "open" : ""}`}>
         <div className="brand">
