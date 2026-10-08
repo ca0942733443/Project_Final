@@ -15,6 +15,7 @@ interface CustomerRow extends RowDataPacket {
   carTypeName: string | null;
   creditLimit: number;
   balanceDue: number;
+  overdueBalance: number;
   orderCount: number;
   totalSpent: number;
   favoriteProduct: string | null;
@@ -142,6 +143,7 @@ customersRouter.get("/", asyncHandler(async (request, response) => {
       ct.ca_rtype_name AS carTypeName,
       c.credit_limit AS creditLimit,
       COALESCE(d.balanceDue, 0) AS balanceDue,
+      COALESCE(d.overdueBalance, 0) AS overdueBalance,
       COALESCE(s.orderCount, 0) AS orderCount,
       COALESCE(s.totalSpent, 0) AS totalSpent,
       s.lastPurchaseAt,
@@ -170,7 +172,10 @@ customersRouter.get("/", asyncHandler(async (request, response) => {
       GROUP BY customer_id
     ) s ON s.customer_id = c.customer_id
     LEFT JOIN (
-      SELECT customer_id, SUM(outstanding_amount) AS balanceDue
+      SELECT
+        customer_id,
+        SUM(outstanding_amount) AS balanceDue,
+        SUM(CASE WHEN due_date IS NOT NULL AND due_date < CURDATE() THEN outstanding_amount ELSE 0 END) AS overdueBalance
       FROM credit_invoices
       WHERE invoice_status IN ('UNPAID', 'PARTIAL', 'OVERDUE')
       GROUP BY customer_id
@@ -180,6 +185,65 @@ customersRouter.get("/", asyncHandler(async (request, response) => {
   `, values);
 
   response.json({ success: true, data: customers });
+}));
+
+customersRouter.get("/:id", asyncHandler(async (request, response) => {
+  const customerId = positiveId(request.params.id, "รหัสลูกค้า");
+  const [customers] = await pool.query<CustomerRow[]>(`
+    SELECT
+      c.customer_id AS id,
+      CONCAT('CUS-', LPAD(c.customer_id, 4, '0')) AS customerCode,
+      c.full_name AS fullName,
+      c.phone,
+      c.car_plate AS carPlate,
+      c.location,
+      c.car_type_car_type_id AS carTypeId,
+      ct.ca_rtype_name AS carTypeName,
+      c.credit_limit AS creditLimit,
+      COALESCE(d.balanceDue, 0) AS balanceDue,
+      COALESCE(d.overdueBalance, 0) AS overdueBalance,
+      COALESCE(s.orderCount, 0) AS orderCount,
+      COALESCE(s.totalSpent, 0) AS totalSpent,
+      s.lastPurchaseAt,
+      (
+        SELECT p.product_name
+        FROM sales favorite_sale
+        INNER JOIN sale_items favorite_item ON favorite_item.sale_id = favorite_sale.sale_id
+        INNER JOIN product_units pu ON pu.product_unit_id = favorite_item.product_unit_id
+        INNER JOIN products p ON p.product_id = pu.product_id
+        WHERE favorite_sale.customer_id = c.customer_id
+          AND favorite_sale.sale_status <> 'CANCELLED'
+        GROUP BY p.product_id, p.product_name
+        ORDER BY SUM(favorite_item.quantity_base) DESC
+        LIMIT 1
+      ) AS favoriteProduct
+    FROM customers c
+    LEFT JOIN car_type ct ON ct.car_type_id = c.car_type_car_type_id
+    LEFT JOIN (
+      SELECT
+        customer_id,
+        COUNT(*) AS orderCount,
+        SUM(total_amount) AS totalSpent,
+        MAX(sold_at) AS lastPurchaseAt
+      FROM sales
+      WHERE sale_status <> 'CANCELLED'
+      GROUP BY customer_id
+    ) s ON s.customer_id = c.customer_id
+    LEFT JOIN (
+      SELECT
+        customer_id,
+        SUM(outstanding_amount) AS balanceDue,
+        SUM(CASE WHEN invoice_status = 'OVERDUE' OR (outstanding_amount > 0 AND due_date IS NOT NULL AND due_date < CURDATE()) THEN outstanding_amount ELSE 0 END) AS overdueBalance
+      FROM credit_invoices
+      WHERE invoice_status IN ('UNPAID', 'PARTIAL', 'OVERDUE')
+      GROUP BY customer_id
+    ) d ON d.customer_id = c.customer_id
+    WHERE c.customer_id = ? AND c.is_active = 1
+    LIMIT 1
+  `, [customerId]);
+  const customer = customers[0];
+  if (!customer) throw new ApiError(404, "ไม่พบลูกค้า");
+  response.json({ success: true, data: customer });
 }));
 
 customersRouter.post("/", asyncHandler(async (request, response) => {

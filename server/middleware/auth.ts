@@ -1,5 +1,5 @@
 import type { RequestHandler } from "express";
-import { verifyAuthToken } from "../utils/auth-token";
+import { type AuthTokenPayload, verifyAuthToken } from "../utils/auth-token";
 
 export const requireAuthentication: RequestHandler = (request, response, next) => {
   const authorization = request.header("authorization");
@@ -12,3 +12,14 @@ export const requireAuthentication: RequestHandler = (request, response, next) =
   response.locals.auth = payload;
   next();
 };
+
+export function requireRoles(...allowedRoles: AuthTokenPayload["role"][]): RequestHandler {
+  return (_request, response, next) => {
+    const payload = response.locals.auth as AuthTokenPayload | undefined;
+    if (!payload || !allowedRoles.includes(payload.role)) {
+      response.status(403).json({ success: false, error: "บัญชีนี้ไม่มีสิทธิ์ดำเนินการ" });
+      return;
+    }
+    next();
+  };
+}

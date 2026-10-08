@@ -329,13 +329,13 @@
 
 "use client";
 
-import { ArrowLeft, Banknote, CheckCircle2, CirclePlus, Delete, Info, QrCode, Search, X } from "lucide-react";
+import { ArrowLeft, Banknote, CheckCircle2, CirclePlus, CreditCard, Delete, Info, QrCode, Search, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { buildPromptPayPayload, defaultPaymentSettings, loadPaymentSettings, PAYMENT_SETTINGS_CHANGED_EVENT, PaymentSettings } from "../_lib/payment";
 import { apiFetch, errorMessage } from "../_lib/api";
 
-type PaymentMethod = "cash" | "qr";
+type PaymentMethod = "cash" | "qr" | "credit";
 
 type PaymentModalProps = {
   orderNumber: string;
@@ -356,6 +356,9 @@ type CustomerSearchResult = {
   fullName: string;
   phone: string | null;
   carPlate: string | null;
+  creditLimit: number;
+  balanceDue: number;
+  overdueBalance: number;
 };
 
 const cashPresets = [100, 500, 1000];
@@ -377,6 +380,17 @@ export default function PaymentModal({ orderNumber, total, onClose, onConfirm }:
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerSearchResult | null>(null);
   const [customerLoading, setCustomerLoading] = useState(false);
   const [customerSearchError, setCustomerSearchError] = useState("");
+  const received = Number(receivedText) || 0;
+  const change = Math.max(0, received - total);
+  const customerCreditLimit = Number(selectedCustomer?.creditLimit ?? 0);
+  const customerBalanceDue = Number(selectedCustomer?.balanceDue ?? 0);
+  const customerOverdueBalance = Number(selectedCustomer?.overdueBalance ?? 0);
+  const availableCredit = Math.max(0, customerCreditLimit - customerBalanceDue);
+  const canConfirm = method === "cash"
+    ? received >= total
+    : method === "qr"
+      ? paymentSettings.promptPayEnabled && Boolean(qrDataUrl)
+      : Boolean(selectedCustomer) && customerCreditLimit > 0 && availableCredit >= total && customerOverdueBalance <= 0;
   const [discountOpen, setDiscountOpen] = useState(false);
   const [discountMode, setDiscountMode] = useState<"amount" | "percent">("amount");
   const [discountInput, setDiscountInput] = useState("0");
@@ -494,6 +508,7 @@ export default function PaymentModal({ orderNumber, total, onClose, onConfirm }:
     setSubmitting(true);
     setError("");
     try {
+      await onConfirm(method, method === "cash" ? received : method === "qr" ? total : 0, selectedCustomer?.id ?? null);
       await onConfirm(
         method, 
         method === "cash" ? received : payableTotal, 
@@ -545,7 +560,7 @@ export default function PaymentModal({ orderNumber, total, onClose, onConfirm }:
 
             {method === "cash" && <button className="payment-discount" type="button" onClick={openDiscount} style={{ cursor: "pointer" }}><CirclePlus size={19}/> {appliedDiscount ? `ส่วนลด ฿${appliedDiscount.toFixed(2)} · แก้ไข` : "เพิ่มส่วนลด"}</button>}
 
-            <div className="payment-methods">
+            <div className="payment-methods payment-methods-three">
               <h3>เลือกวิธีการชำระเงิน</h3>
               <button className={method === "cash" ? "active" : ""} onClick={() => setMethod("cash")} type="button">
                 <Banknote size={30} />
@@ -554,6 +569,15 @@ export default function PaymentModal({ orderNumber, total, onClose, onConfirm }:
               <button aria-disabled={!paymentSettings.promptPayEnabled} className={`${method === "qr" ? "active" : ""} ${!paymentSettings.promptPayEnabled ? "disabled" : ""}`} disabled={!paymentSettings.promptPayEnabled} onClick={() => setMethod("qr")} type="button">
                 <QrCode size={30} />
                 <strong>QR<br />PromptPay</strong>
+              </button>
+              <button
+                aria-label="ขายเชื่อ"
+                className={`payment-method-credit ${method === "credit" ? "active" : ""}`}
+                onClick={() => setMethod("credit")}
+                type="button"
+              >
+                <CreditCard size={30} />
+                <strong>ขายเชื่อ</strong>
               </button>
             </div>
 
@@ -564,6 +588,7 @@ export default function PaymentModal({ orderNumber, total, onClose, onConfirm }:
                   <div>
                     <strong>{selectedCustomer.fullName}</strong>
                     <small>{[selectedCustomer.phone, selectedCustomer.carPlate].filter(Boolean).join(" · ") || selectedCustomer.customerCode}</small>
+                    {method === "credit" && <small>วงเงินใช้ได้ ฿{availableCredit.toLocaleString("th-TH", { minimumFractionDigits: 2 })}</small>}
                   </div>
                   <button type="button" onClick={() => setSelectedCustomer(null)}>เปลี่ยน</button>
                 </div>
@@ -645,6 +670,19 @@ export default function PaymentModal({ orderNumber, total, onClose, onConfirm }:
                 </div>
               </div>
             ) : (
+              method === "qr" ? <div className="qr-payment-panel">
+                {qrDataUrl ? <img alt={`QR PromptPay สำหรับยอด ${total.toFixed(2)} บาท`} src={qrDataUrl} /> : <div className="qr-payment-error"><QrCode size={42} /><span>{qrError || "กำลังสร้าง QR PromptPay..."}</span></div>}
+              </div> : <div className="credit-payment-panel">
+                <CreditCard size={44} />
+                <h3>{selectedCustomer ? selectedCustomer.fullName : "กรุณาเลือกลูกค้า"}</h3>
+                {selectedCustomer ? <>
+                  <div><span>วงเงินเครดิต</span><strong>฿{customerCreditLimit.toLocaleString("th-TH", { minimumFractionDigits: 2 })}</strong></div>
+                  <div><span>ยอดค้างปัจจุบัน</span><strong>฿{customerBalanceDue.toLocaleString("th-TH", { minimumFractionDigits: 2 })}</strong></div>
+                  {customerOverdueBalance > 0 && <div className="credit-insufficient"><span>ยอดเกินกำหนด</span><strong>฿{customerOverdueBalance.toLocaleString("th-TH", { minimumFractionDigits: 2 })}</strong></div>}
+                  <div><span>ยอดขายเชื่อครั้งนี้</span><strong>฿{total.toLocaleString("th-TH", { minimumFractionDigits: 2 })}</strong></div>
+                  <div className={availableCredit < total ? "credit-insufficient" : "credit-available"}><span>วงเงินคงเหลือหลังขาย</span><strong>฿{Math.max(0, availableCredit - total).toLocaleString("th-TH", { minimumFractionDigits: 2 })}</strong></div>
+                  <p>{customerOverdueBalance > 0 ? "ลูกค้ามีหนี้เกินกำหนด กรุณารับชำระก่อน" : availableCredit >= total && customerCreditLimit > 0 ? "ครบกำหนดชำระภายใน 7 วัน" : "วงเงินเครดิตไม่เพียงพอสำหรับรายการนี้"}</p>
+                </> : <p>ค้นหาและเลือกลูกค้าทางด้านซ้ายก่อนยืนยันการขายเชื่อ</p>}
               /* 🟢 แสดงผลรูปภาพ Data URL ที่เจนขึ้นมาสดๆ */
               <div className="qr-payment-panel" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "20px" }}>
                 {qrDataUrl ? (

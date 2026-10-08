@@ -2,6 +2,7 @@ import type { ComponentType } from "react";
 import { notFound } from "next/navigation";
 
 import CustomersScreen from "../_screens/CustomersScreen";
+import CustomerCreditDetailScreen from "../_screens/CustomerCreditDetailScreen";
 import DashboardScreen from "../_screens/DashboardScreen";
 import EmployeesScreen from "../_screens/EmployeesScreen";
 import HistoryScreen from "../_screens/HistoryScreen";
@@ -23,6 +24,7 @@ import AddProductScreen from "../_screens/AddProductScreen";
 
 const routeScreens: Record<string, ComponentType> = {
   customers: CustomersScreen,
+  "customer-credit": CustomerCreditDetailScreen,
   employees: EmployeesScreen,
   history: HistoryScreen,
   inventory: InventoryScreen,

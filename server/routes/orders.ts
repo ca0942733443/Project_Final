@@ -6,6 +6,7 @@ import { deductStock } from "../db/stock";
 import { ApiError } from "../utils/api-error";
 import { authenticatedUserId } from "../utils/auth-context";
 import { asyncHandler } from "../utils/async-handler";
+import { requireRoles } from "../middleware/auth";
 
 type PaymentMethod = "cash" | "qr" | "credit";
 
@@ -34,7 +35,7 @@ interface OrderListRow extends RowDataPacket {
   orderNumber: string;
   subtotal: number;
   total: number;
-  status: "paid" | "cancelled";
+  status: "paid" | "credit" | "cancelled";
   createdAt: Date;
   customerName: string | null;
   employeeName: string | null;
@@ -133,7 +134,11 @@ ordersRouter.get("/", asyncHandler(async (request, response) => {
       s.sale_no AS orderNumber,
       s.subtotal,
       s.total_amount AS total,
-      CASE WHEN s.sale_status = 'CANCELLED' THEN 'cancelled' ELSE 'paid' END AS status,
+      CASE
+        WHEN s.sale_status = 'CANCELLED' THEN 'cancelled'
+        WHEN s.sale_status = 'CREDIT' THEN 'credit'
+        ELSE 'paid'
+      END AS status,
       s.sold_at AS createdAt,
       c.full_name AS customerName,
       u.full_name AS employeeName,
@@ -165,7 +170,7 @@ ordersRouter.get("/", asyncHandler(async (request, response) => {
   response.json({ success: true, data: { items: orders, summary: summaryRows[0] } });
 }));
 
-ordersRouter.post("/", asyncHandler(async (request, response) => {
+ordersRouter.post("/", requireRoles("owner", "cashier"), asyncHandler(async (request, response) => {
   const body = request.body as {
     customerId?: unknown;
     employeeId?: unknown;
@@ -179,10 +184,7 @@ ordersRouter.post("/", asyncHandler(async (request, response) => {
   if (!Array.isArray(body.items) || body.items.length === 0) {
     throw new ApiError(400, "กรุณาระบุสินค้าอย่างน้อย 1 รายการ");
   }
-  if (body.paymentMethod === "credit") {
-    throw new ApiError(400, "ระบบขายเชื่อถูกปิดใช้งานชั่วคราว รองรับเฉพาะเงินสดและ QR PromptPay");
-  }
-  if (!("cash qr".split(" ") as unknown[]).includes(body.paymentMethod)) {
+  if (!("cash qr credit".split(" ") as unknown[]).includes(body.paymentMethod)) {
     throw new ApiError(400, "ช่องทางชำระเงินไม่ถูกต้อง");
   }
   const paymentMethod = body.paymentMethod as PaymentMethod;
@@ -288,12 +290,18 @@ ordersRouter.post("/", asyncHandler(async (request, response) => {
       const customer = customers[0];
       if (!customer) throw new ApiError(404, "ไม่พบลูกค้า");
       if (paymentMethod === "credit") {
-        const [debts] = await connection.query<Array<RowDataPacket & { balanceDue: number }>>(`
-          SELECT COALESCE(SUM(outstanding_amount), 0) AS balanceDue
+        const [debts] = await connection.query<Array<RowDataPacket & { balanceDue: number; overdueBalance: number }>>(`
+          SELECT
+            COALESCE(SUM(outstanding_amount), 0) AS balanceDue,
+            COALESCE(SUM(CASE WHEN due_date IS NOT NULL AND due_date < CURDATE() THEN outstanding_amount ELSE 0 END), 0) AS overdueBalance
           FROM credit_invoices
           WHERE customer_id = ? AND invoice_status IN ('UNPAID', 'PARTIAL', 'OVERDUE')
         `, [customerId]);
         const balanceDue = Number(debts[0]?.balanceDue ?? 0);
+        const overdueBalance = Number(debts[0]?.overdueBalance ?? 0);
+        if (overdueBalance > 0) {
+          throw new ApiError(409, "ลูกค้ามีหนี้เกินกำหนด กรุณารับชำระก่อนทำรายการขายเชื่อใหม่", { overdueBalance });
+        }
         if (Number(customer.creditLimit) <= 0 || balanceDue + total > Number(customer.creditLimit)) {
           throw new ApiError(409, "วงเงินเครดิตของลูกค้าไม่เพียงพอ");
         }
@@ -342,10 +350,10 @@ ordersRouter.post("/", asyncHandler(async (request, response) => {
     if (paymentMethod === "credit" && customerId !== null) {
       await connection.execute(`
         INSERT INTO credit_invoices (
-          sale_id, customer_id, invoice_no, original_amount,
+          sale_id, customer_id, invoice_no, due_date, original_amount,
           outstanding_amount, invoice_status
         )
-        VALUES (?, ?, ?, ?, ?, 'UNPAID')
+        VALUES (?, ?, ?, DATE_ADD(CURDATE(), INTERVAL 7 DAY), ?, ?, 'UNPAID')
       `, [saleResult.insertId, customerId, `CR-${orderNumber}`, total, total]);
     } else {
       const databasePaymentMethod = paymentMethod === "cash" ? "CASH" : "QR_CODE";

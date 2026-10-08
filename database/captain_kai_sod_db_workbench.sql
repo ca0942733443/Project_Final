@@ -420,14 +420,21 @@ CREATE TABLE IF NOT EXISTS `captain_kai_sod_db`.`order_recommendations` (
   `recommendation_id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
   `created_by` INT UNSIGNED NOT NULL,
   `recommendation_date` DATE NOT NULL,
-  `status` ENUM('DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED') NOT NULL DEFAULT 'DRAFT',
+  `status` ENUM('DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED', 'RECEIVED') NOT NULL DEFAULT 'DRAFT',
   `note` TEXT NULL DEFAULT NULL,
+  `goods_receipt_id` INT UNSIGNED NULL DEFAULT NULL,
   PRIMARY KEY (`recommendation_id`),
+  UNIQUE INDEX `uq_order_recommendations_receipt` (`goods_receipt_id` ASC) VISIBLE,
   INDEX `fk_order_recommendations_user` (`created_by` ASC) VISIBLE,
   CONSTRAINT `fk_order_recommendations_user`
     FOREIGN KEY (`created_by`)
     REFERENCES `captain_kai_sod_db`.`users` (`user_id`)
     ON DELETE RESTRICT
+    ON UPDATE CASCADE,
+  CONSTRAINT `fk_order_recommendations_receipt`
+    FOREIGN KEY (`goods_receipt_id`)
+    REFERENCES `captain_kai_sod_db`.`goods_receipts` (`receipt_id`)
+    ON DELETE SET NULL
     ON UPDATE CASCADE)
 ENGINE = InnoDB;
 

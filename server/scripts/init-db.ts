@@ -22,6 +22,15 @@ async function constraintExists(connection: mysql.Connection, tableName: string,
   return Number(rows[0]?.count ?? 0) > 0;
 }
 
+async function indexExists(connection: mysql.Connection, tableName: string, indexName: string) {
+  const [rows] = await connection.query<Array<RowDataPacket & { count: number }>>(`
+    SELECT COUNT(*) AS count
+    FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?
+  `, [tableName, indexName]);
+  return Number(rows[0]?.count ?? 0) > 0;
+}
+
 async function initializeDatabase() {
   if (!/^[a-zA-Z0-9_]+$/.test(env.database.name)) {
     throw new Error("DB_NAME ใช้ได้เฉพาะตัวอักษร ตัวเลข และ underscore");
@@ -83,6 +92,27 @@ async function initializeDatabase() {
         ALTER TABLE products
         ADD CONSTRAINT fk_products_supplier
         FOREIGN KEY (supplier_id) REFERENCES suppliers (supplier_id)
+        ON DELETE SET NULL ON UPDATE CASCADE
+      `);
+    }
+    await connection.query(`
+      ALTER TABLE order_recommendations
+      MODIFY COLUMN status ENUM('DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED', 'RECEIVED') NOT NULL DEFAULT 'DRAFT'
+    `);
+    if (!(await columnExists(connection, "order_recommendations", "goods_receipt_id"))) {
+      await connection.query("ALTER TABLE order_recommendations ADD COLUMN goods_receipt_id INT UNSIGNED NULL AFTER note");
+    }
+    if (!(await indexExists(connection, "order_recommendations", "uq_order_recommendations_receipt"))) {
+      await connection.query(`
+        ALTER TABLE order_recommendations
+        ADD UNIQUE INDEX uq_order_recommendations_receipt (goods_receipt_id)
+      `);
+    }
+    if (!(await constraintExists(connection, "order_recommendations", "fk_order_recommendations_receipt"))) {
+      await connection.query(`
+        ALTER TABLE order_recommendations
+        ADD CONSTRAINT fk_order_recommendations_receipt
+        FOREIGN KEY (goods_receipt_id) REFERENCES goods_receipts (receipt_id)
         ON DELETE SET NULL ON UPDATE CASCADE
       `);
     }
