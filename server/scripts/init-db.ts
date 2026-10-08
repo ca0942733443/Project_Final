@@ -22,6 +22,15 @@ async function constraintExists(connection: mysql.Connection, tableName: string,
   return Number(rows[0]?.count ?? 0) > 0;
 }
 
+async function indexExists(connection: mysql.Connection, tableName: string, indexName: string) {
+  const [rows] = await connection.query<Array<RowDataPacket & { count: number }>>(`
+    SELECT COUNT(*) AS count
+    FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?
+  `, [tableName, indexName]);
+  return Number(rows[0]?.count ?? 0) > 0;
+}
+
 async function initializeDatabase() {
   if (!/^[a-zA-Z0-9_]+$/.test(env.database.name)) {
     throw new Error("DB_NAME ใช้ได้เฉพาะตัวอักษร ตัวเลข และ underscore");
@@ -43,8 +52,29 @@ async function initializeDatabase() {
     await connection.query(`CREATE DATABASE IF NOT EXISTS \`${env.database.name}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
     await connection.query(`USE \`${env.database.name}\``);
     await connection.query(schema);
+    if (!(await columnExists(connection, "categories", "is_active"))) {
+      await connection.query("ALTER TABLE categories ADD COLUMN is_active TINYINT NOT NULL DEFAULT TRUE");
+    }
+    if (!(await columnExists(connection, "sub_categories", "is_active"))) {
+      await connection.query("ALTER TABLE sub_categories ADD COLUMN is_active TINYINT NOT NULL DEFAULT TRUE");
+    }
+    if (!(await columnExists(connection, "suppliers", "line_id"))) {
+      await connection.query("ALTER TABLE suppliers ADD COLUMN line_id VARCHAR(100) NULL AFTER phone");
+    }
+    if (!(await columnExists(connection, "suppliers", "products_supplied"))) {
+      await connection.query("ALTER TABLE suppliers ADD COLUMN products_supplied TEXT NULL AFTER line_id");
+    }
     if (!(await columnExists(connection, "products", "supplier_id"))) {
       await connection.query("ALTER TABLE products ADD COLUMN supplier_id INT UNSIGNED NULL AFTER category_id");
+    }
+    if (!(await columnExists(connection, "products", "sub_category_id"))) {
+      await connection.query("ALTER TABLE products ADD COLUMN sub_category_id INT UNSIGNED NULL AFTER category_id");
+    }
+    if (!(await columnExists(connection, "products", "description"))) {
+      await connection.query("ALTER TABLE products ADD COLUMN description TEXT NULL AFTER product_name");
+    }
+    if (!(await columnExists(connection, "products", "cost_price"))) {
+      await connection.query("ALTER TABLE products ADD COLUMN cost_price DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER description");
     }
     if (!(await columnExists(connection, "products", "image_url"))) {
       await connection.query("ALTER TABLE products ADD COLUMN image_url VARCHAR(500) NULL AFTER reorder_point");
@@ -62,6 +92,27 @@ async function initializeDatabase() {
         ALTER TABLE products
         ADD CONSTRAINT fk_products_supplier
         FOREIGN KEY (supplier_id) REFERENCES suppliers (supplier_id)
+        ON DELETE SET NULL ON UPDATE CASCADE
+      `);
+    }
+    await connection.query(`
+      ALTER TABLE order_recommendations
+      MODIFY COLUMN status ENUM('DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED', 'RECEIVED') NOT NULL DEFAULT 'DRAFT'
+    `);
+    if (!(await columnExists(connection, "order_recommendations", "goods_receipt_id"))) {
+      await connection.query("ALTER TABLE order_recommendations ADD COLUMN goods_receipt_id INT UNSIGNED NULL AFTER note");
+    }
+    if (!(await indexExists(connection, "order_recommendations", "uq_order_recommendations_receipt"))) {
+      await connection.query(`
+        ALTER TABLE order_recommendations
+        ADD UNIQUE INDEX uq_order_recommendations_receipt (goods_receipt_id)
+      `);
+    }
+    if (!(await constraintExists(connection, "order_recommendations", "fk_order_recommendations_receipt"))) {
+      await connection.query(`
+        ALTER TABLE order_recommendations
+        ADD CONSTRAINT fk_order_recommendations_receipt
+        FOREIGN KEY (goods_receipt_id) REFERENCES goods_receipts (receipt_id)
         ON DELETE SET NULL ON UPDATE CASCADE
       `);
     }
