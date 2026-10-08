@@ -1,7 +1,18 @@
 "use client";
 
-import { Minus, Plus, Printer, ShoppingCart } from "lucide-react";
-import { useEffect, useState } from "react";
+import {
+  PanelLeftClose,
+  PanelLeftOpen,
+  Minus,
+  Plus,
+  Printer,
+  ShoppingCart,
+  LayoutGrid,
+  Filter,
+  RotateCcw,
+  X,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import AdminShell from "../_components/AdminShell";
 import { PageTitle } from "../_components/PageElements";
 import PaymentModal from "../_components/PaymentModal";
@@ -14,15 +25,55 @@ type Product = {
   price: number;
   unit: string;
   imageUrl: string | null;
+  categoryId: number;
   categoryName: string;
+  subCategoryId: number | null;
+  description?: string | null;
+  supplierName?: string | null;
+  soldQuantity?: number;
   stockQuantity: number;
+  barcode?: string | null;
 };
 
-type Category = { id: number; name: string; slug: string };
-type CreatedOrder = { orderNumber: string; total: number; amountReceived: number; changeAmount: number; paymentMethod: "cash" | "qr" | "credit" };
+type SubCategory = { id: number; name: string };
+type Category = { id: number; name: string; slug: string; subCategories?: SubCategory[] };
+type CreatedOrder = { 
+  orderNumber: string; 
+  subtotal: number; 
+  discountAmount: number; 
+  total: number; 
+  amountReceived: number; 
+  changeAmount: number; 
+  paymentMethod: "cash" | "qr";
+  customerName?: string;
+};
+
+type ProductSort = "best-selling" | "name-asc" | "name-desc" | "price-asc" | "price-desc";
+
+function packageFacet(product: Product) {
+  const source = `${product.name} ${product.description ?? ""}`;
+  const match = source.match(/\d+(?:[.,]\d+)?\s?(?:กก\.?|กิโลกรัม|กรัม|มล\.?|มิลลิลิตร|ลิตร|kg|g|ml|l)/iu);
+  return match?.[0].replace(/\s+/g, " ").trim() ?? "ไม่ระบุขนาด";
+}
+
+function brandFacet(product: Product) {
+  const source = `${product.name} ${product.description ?? ""}`;
+  const labeled = source.match(/(?:แบรนด์|ยี่ห้อ|brand)\s*[:：]?\s*([^\s,;]+)/iu);
+  if (labeled?.[1]) return labeled[1].trim();
+  const trademark = source.match(/ตรา\s*([^\s,;]+)/u);
+  return trademark?.[1] ? `ตรา${trademark[1].trim()}` : "ไม่ระบุแบรนด์";
+}
 
 export default function PosScreen() {
-  const [category, setCategory] = useState("ทั้งหมด");
+  const [category, setCategory] = useState("ALL");
+  const [subCategory, setSubCategory] = useState("ALL");
+  const [sortBy, setSortBy] = useState<ProductSort>("best-selling");
+
+  // Single Select สำหรับ Dropdowns
+  const [selectedBrand, setSelectedBrand] = useState("ALL");
+  const [selectedPackage, setSelectedPackage] = useState("ALL");
+  const [selectedSupplier, setSelectedSupplier] = useState("ALL");
+
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [cart, setCart] = useState<Record<number, number>>({});
@@ -31,17 +82,66 @@ export default function PosScreen() {
   const [error, setError] = useState("");
   const [lastOrderNumber, setLastOrderNumber] = useState("รายการใหม่");
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
+  const [sidebarHidden, setSidebarHidden] = useState(false);
 
-  // กรองตามหมวดหมู่ + ย้ายสินค้าหมดไปไว้ด้านล่างสุด
-  const visibleProducts = (category === "ทั้งหมด" 
-    ? products 
-    : products.filter(product => product.categoryName === category)
-  ).slice().sort((a, b) => {
+  // State & Ref สำหรับระบบสแกนบาร์โค้ด
+  const [barcodeInput, setBarcodeInput] = useState("");
+  const barcodeInputRef = useRef<HTMLInputElement>(null);
+
+  const selectedCategory = categories.find((item) => String(item.id) === category);
+
+  // 1. กรองสินค้าตามหมวดหมู่หลักและหมวดหมู่ย่อยก่อน
+  const categoryFilteredProducts = products.filter((product) => {
+    const matchesCategory = category === "ALL" || String(product.categoryId) === category;
+    const matchesSubCategory = subCategory === "ALL" || String(product.subCategoryId ?? "") === subCategory;
+    return matchesCategory && matchesSubCategory;
+  });
+
+  // 2. คำนวณแบรนด์, ขนาดบรรจุ, ผู้จำหน่าย dynamic ตามสินค้าในหมวดหมู่ที่เลือก
+  const packageOptions = Array.from(new Set(categoryFilteredProducts.map(packageFacet)))
+    .filter(p => p !== "ไม่ระบุขนาด")
+    .sort((a, b) => a.localeCompare(b, "th", { numeric: true }));
+
+  const brandOptions = Array.from(new Set(categoryFilteredProducts.map(brandFacet)))
+    .filter(b => b !== "ไม่ระบุแบรนด์")
+    .sort((a, b) => a.localeCompare(b, "th"));
+
+  const supplierOptions = Array.from(new Set(categoryFilteredProducts.map((product) => product.supplierName?.trim() || "ไม่ระบุผู้จำหน่าย")))
+    .filter(s => s !== "ไม่ระบุผู้จำหน่าย")
+    .sort((a, b) => a.localeCompare(b, "th"));
+
+  // รวบรวมตัวเลือกที่ถูกเลือกอยู่เพื่อนำมาแสดงเป็น Quick Filter Chips
+  const activeSelectedFilters = [
+    { type: "brand", value: selectedBrand, clear: () => setSelectedBrand("ALL") },
+    { type: "package", value: selectedPackage, clear: () => setSelectedPackage("ALL") },
+    { type: "supplier", value: selectedSupplier, clear: () => setSelectedSupplier("ALL") },
+  ].filter(f => f.value !== "ALL");
+
+  // สแกนและกรองสินค้าเรียบร้อยแล้ว -> จัดเรียงสินค้า
+  const visibleProducts = categoryFilteredProducts.filter((product) => {
+    const matchesBrand = selectedBrand === "ALL" || brandFacet(product) === selectedBrand;
+    const matchesPackage = selectedPackage === "ALL" || packageFacet(product) === selectedPackage;
+    const matchesSupplier = selectedSupplier === "ALL" || (product.supplierName?.trim() || "ไม่ระบุผู้จำหน่าย") === selectedSupplier;
+    
+    return matchesBrand && matchesPackage && matchesSupplier;
+  }).slice().sort((a, b) => {
+    // 🟢 1. เช็คสต็อกก่อนเลย: สินค้าหมด (<= 0) ให้ไปอยู่ท้ายสุดเสมอ
     const aOut = a.stockQuantity <= 0;
     const bOut = b.stockQuantity <= 0;
-    if (aOut && !bOut) return 1;
-    if (!aOut && bOut) return -1;
-    return 0;
+    if (aOut && !bOut) return 1;  // a หมด -> ย้ายไปหลัง
+    if (!aOut && bOut) return -1; // b หมด -> b ย้ายไปหลัง
+
+    // 2. ถ้าสต็อกมีทั้งคู่ (หรือหมดทั้งคู่) ค่อยเรียงตามตัวเลือก SortBy
+    if (sortBy === "best-selling") {
+      const salesDifference = Number(b.soldQuantity ?? 0) - Number(a.soldQuantity ?? 0);
+      if (salesDifference !== 0) return salesDifference;
+    }
+    if (sortBy === "name-asc") return a.name.localeCompare(b.name, "th");
+    if (sortBy === "name-desc") return b.name.localeCompare(a.name, "th");
+    if (sortBy === "price-asc") return a.price - b.price || a.name.localeCompare(b.name, "th");
+    if (sortBy === "price-desc") return b.price - a.price || a.name.localeCompare(b.name, "th");
+
+    return a.name.localeCompare(b.name, "th");
   });
 
   const productById = new Map(products.map((product) => [product.id, product]));
@@ -51,6 +151,69 @@ export default function PosScreen() {
     ...current,
     [product.id]: Math.min(product.stockQuantity, Math.max(0, (current[product.id] || 0) + delta)),
   }));
+
+  const resetFilters = () => {
+    setSelectedBrand("ALL");
+    setSelectedPackage("ALL");
+    setSelectedSupplier("ALL");
+  };
+
+  const handleCategoryChange = (newCatId: string) => {
+    setCategory(newCatId);
+    setSubCategory("ALL");
+    resetFilters();
+  };
+
+  const handleSubCategoryChange = (newSubCatId: string) => {
+    setSubCategory(newSubCatId);
+    resetFilters();
+  };
+
+  // ตรวจสอบรหัสทันทีที่มีการเปลี่ยนแปลงในช่องพิมพ์ (ไม่ต้องกด Enter)
+  const handleBarcodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setBarcodeInput(value);
+
+    const query = value.trim().toLowerCase();
+    if (!query) return;
+
+    const matchedProduct = products.find(
+      (p) => p.barcode?.toLowerCase() === query
+    );
+
+    if (matchedProduct) {
+      if (matchedProduct.stockQuantity > (cart[matchedProduct.id] || 0)) {
+        changeQuantity(matchedProduct, 1);
+      } else {
+        alert(`สินค้า "${matchedProduct.name}" สต็อกไม่พอ`);
+      }
+      setBarcodeInput(""); // เคลียร์ช่องป้อนข้อมูลทันทีที่เจอ
+    }
+  };
+
+  // สำรองสำหรับการกด Enter ค้นหาจากชื่อสินค้า
+  const handleBarcodeSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const query = barcodeInput.trim().toLowerCase();
+    if (!query) return;
+
+    const matchedProduct = products.find(
+      (p) => p.barcode?.toLowerCase() === query || p.name.toLowerCase().includes(query)
+    );
+
+    if (matchedProduct) {
+      if (matchedProduct.stockQuantity > (cart[matchedProduct.id] || 0)) {
+        changeQuantity(matchedProduct, 1);
+      } else {
+        alert(`สินค้า "${matchedProduct.name}" สต็อกไม่พอ`);
+      }
+    } else {
+      alert("ไม่พบสินค้าตามบาร์โค้ดหรือชื่อที่ระบุ");
+    }
+
+    setBarcodeInput("");
+    barcodeInputRef.current?.focus();
+  };
 
   useEffect(() => {
     Promise.all([apiFetch<Product[]>("/products"), apiFetch<Category[]>("/categories")])
@@ -62,28 +225,65 @@ export default function PosScreen() {
       .finally(() => setLoading(false));
   }, []);
 
-  const createOrder = async (method: "cash" | "qr" | "credit", amountReceived: number, customerId: number | null) => {
-    const receiptItems = Object.entries(cart).filter(([, quantity]) => quantity > 0).map(([productId, quantity]) => {
-      const product = productById.get(Number(productId));
-      return { productName: product?.name ?? "สินค้า", quantity, lineTotal: (product?.price ?? 0) * quantity };
-    });
+  const createOrder = async (
+    method: "cash" | "qr", 
+    amountReceived: number, 
+    customerId: number | null, 
+    discountAmount: number,
+    customerName?: string // รองรับชื่อลูกค้าจาก PaymentModal
+  ) => {
+    const receiptItems = Object.entries(cart)
+      .filter(([, quantity]) => quantity > 0)
+      .map(([productId, quantity]) => {
+        const product = productById.get(Number(productId));
+        return { 
+          productName: product?.name ?? "สินค้า", 
+          quantity, 
+          lineTotal: (product?.price ?? 0) * quantity
+        };
+      });
+
+    const finalTotal = Math.max(0, total - discountAmount);
+
+    // คำนวณคะแนนสะสม (ทุก 100 บาท = 1 คะแนน เฉพาะบิลนี้ ไม่สะสมเศษ)
+    const pointsEarned = customerId ? Math.floor(finalTotal / 100) : 0;
+
     const order = await apiFetch<CreatedOrder>("/orders", {
       method: "POST",
       body: JSON.stringify({
         paymentMethod: method,
         amountReceived,
+        discountAmount,
         customerId,
+        pointsEarned, // ส่งคะแนนที่ได้รับไปบันทึกใน DB
         items: Object.entries(cart)
           .filter(([, quantity]) => quantity > 0)
           .map(([productId, quantity]) => ({ productId: Number(productId), quantity })),
       }),
     });
+
     setProducts((current) => current.map((product) => ({
       ...product,
       stockQuantity: product.stockQuantity - (cart[product.id] ?? 0),
     })));
+
     setLastOrderNumber(order.orderNumber);
-    setReceipt({ orderNumber: order.orderNumber, createdAt: new Date().toISOString(), items: receiptItems, subtotal: order.total, total: order.total, paymentMethod: order.paymentMethod, amountReceived: order.amountReceived, changeAmount: order.changeAmount });
+
+    // ส่งข้อมูลครบถ้วนไปยังใบเสร็จ
+    setReceipt({ 
+      orderNumber: order.orderNumber, 
+      createdAt: new Date().toISOString(), 
+      items: receiptItems, 
+      subtotal: Number(order.subtotal ?? total), 
+      discountAmount: Number(order.discountAmount ?? discountAmount), 
+      total: Number(order.total ?? finalTotal), 
+      paymentMethod: method,
+      amountReceived: order.amountReceived, 
+      changeAmount: order.changeAmount,
+      customerName: customerName || order.customerName || (customerId ? "ลูกค้าสมาชิก" : "ลูกค้าทั่วไป"),
+      pointsEarned: pointsEarned
+    });
+
     setCart({});
     setPaymentOpen(false);
   };

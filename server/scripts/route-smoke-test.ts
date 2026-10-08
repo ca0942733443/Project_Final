@@ -11,6 +11,7 @@ const marker = Date.now().toString(36);
 const categoryName = `__route_test_category_${marker}`;
 const supplierName = `__route_test_supplier_${marker}`;
 const sku = `ROUTE-${marker}`.toUpperCase();
+const barcode = `ROUTE-BAR-${marker}`.toUpperCase();
 const phone = `09${String(Date.now()).slice(-8)}`;
 const employeeEmail = `route-test-${marker}@example.com`;
 const inventoryOrderNote = `route-test-order-${marker}`;
@@ -74,6 +75,11 @@ async function cleanup(connection: mysql.Connection) {
 
   await connection.query("DELETE FROM customers WHERE phone = ?", [phone]);
   await connection.query("DELETE FROM users WHERE username = ?", [employeeEmail]);
+  await connection.query(`
+    DELETE sc FROM sub_categories sc
+    INNER JOIN categories c ON c.category_id = sc.category_id
+    WHERE c.category_name = ?
+  `, [categoryName]);
   await connection.query("DELETE FROM categories WHERE category_name = ?", [categoryName]);
   await connection.query(`
     DELETE FROM suppliers
@@ -122,15 +128,42 @@ async function run() {
       body: JSON.stringify({ email: "captain@gmail.com", password: "captain123" }),
     });
     const token = login.token;
+    const subCategory = await api<{ id: number }>(`/categories/${category.insertId}/subcategories`, token, {
+      method: "POST",
+      body: JSON.stringify({ name: `__route_test_subcategory_${marker}` }),
+    });
     const customerOptions = await api<{ carTypes: Array<{ id: number }> }>("/customers/options", token);
     if (!Array.isArray(customerOptions.carTypes)) throw new Error("Customer options response is invalid");
 
-    const supplier = await api<{ id: number }>("/suppliers", token, {
+    const supplier = await api<{ id: number; lineId: string | null; productsSupplied: string | null }>("/suppliers", token, {
       method: "POST",
-      body: JSON.stringify({ name: supplierName, phone: "089-000-0000", address: "Route test address" }),
+      body: JSON.stringify({
+        name: supplierName,
+        phone: "089-000-0000",
+        lineId: "@route-test",
+        productsSupplied: "สินค้า route test",
+        address: "Route test address",
+      }),
     });
-    const supplierRows = await api<Array<{ id: number }>>(`/suppliers?search=${encodeURIComponent(supplierName)}`, token);
+    if (supplier.lineId !== "@route-test" || supplier.productsSupplied !== "สินค้า route test") {
+      throw new Error("Supplier create did not return LINE ID or products supplied");
+    }
+    const supplierRows = await api<Array<{ id: number }>>(`/suppliers?search=${encodeURIComponent("สินค้า route test")}`, token);
     if (!supplierRows.some((row) => row.id === supplier.id)) throw new Error("Supplier was not returned by search");
+    await api(`/suppliers/${supplier.id}`, token, {
+      method: "PUT",
+      body: JSON.stringify({
+        name: supplierName,
+        phone: "089-000-0000",
+        lineId: "@route-test-updated",
+        productsSupplied: "สินค้า route test ที่แก้ไข",
+        address: "Route test address",
+      }),
+    });
+    const supplierDetail = await api<{ lineId: string | null; productsSupplied: string | null }>(`/suppliers/${supplier.id}`, token);
+    if (supplierDetail.lineId !== "@route-test-updated" || supplierDetail.productsSupplied !== "สินค้า route test ที่แก้ไข") {
+      throw new Error("Supplier update did not persist LINE ID or products supplied");
+    }
 
     const employee = await api<{ id: number }>("/employees", token, {
       method: "POST",
@@ -175,17 +208,41 @@ async function run() {
         sku,
         name: "Route Test Product",
         categoryId: category.insertId,
+        subCategoryId: subCategory.id,
         supplierId: supplier.id,
+        barcode,
+        description: "Route test product description",
+        costPrice: 35,
         price: 50,
         unit: "ชิ้น",
         stockQuantity: 20,
         lowStockThreshold: 5,
       }),
     });
+    const createdProduct = await api<{ barcode: string | null; description: string | null; costPrice: number; subCategoryId: number | null }>(`/products/${product.id}`, token);
+    if (
+      createdProduct.barcode !== barcode
+      || createdProduct.description !== "Route test product description"
+      || createdProduct.costPrice !== 35
+      || createdProduct.subCategoryId !== subCategory.id
+    ) {
+      throw new Error("Product create did not persist barcode, description, cost price, or subcategory");
+    }
     await api(`/products/${product.id}`, token, {
       method: "PATCH",
-      body: JSON.stringify({ name: "Route Test Product Updated", price: 55, stockQuantity: 18 }),
+      body: JSON.stringify({
+        name: "Route Test Product Updated",
+        barcode: `${barcode}-UPDATED`,
+        description: "Route test product description updated",
+        costPrice: 40,
+        price: 55,
+        stockQuantity: 18,
+      }),
     });
+    const updatedProduct = await api<{ barcode: string | null; description: string | null; costPrice: number }>(`/products/${product.id}`, token);
+    if (updatedProduct.barcode !== `${barcode}-UPDATED` || updatedProduct.description !== "Route test product description updated" || updatedProduct.costPrice !== 40) {
+      throw new Error("Product update did not persist barcode, description, or cost price");
+    }
     await api("/inventory/movements", token, {
       method: "POST",
       body: JSON.stringify({ productId: product.id, movementType: "purchase", quantity: 2, supplierId: supplier.id, unitCost: 40, note: marker }),
@@ -288,7 +345,7 @@ async function run() {
       tested: [
         "employees POST/PATCH/DELETE",
         "customers POST/PATCH/DELETE",
-        "suppliers GET/POST",
+        "suppliers GET/POST/PUT/detail",
         "products POST/GET/PATCH/DELETE",
         "inventory GET/POST",
         "inventory-orders GET/POST/PATCH/detail",

@@ -65,7 +65,7 @@ export default function HistoryScreen() {
     }
   };
 
-  useEffect(() => { void loadOrders(); }, []); // โหลดข้อมูลเริ่มต้นหนึ่งครั้ง ส่วนตัวกรองจะโหลดใหม่ทันทีเมื่อเปลี่ยนค่า
+  useEffect(() => { void loadOrders(); }, []);
 
   const filterOrders = (event: FormEvent) => {
     event.preventDefault();
@@ -102,11 +102,34 @@ export default function HistoryScreen() {
   });
 
   const openReceipt = async (order: Order) => {
-    type OrderDetail = { orderNumber: string; subtotal: number; total: number; createdAt: string; items: Array<{ productName: string; quantity: number; lineTotal: number }>; payments: Array<{ method: "cash" | "qr" | "credit"; amountReceived: number; changeAmount: number }> };
+    type OrderDetail = { 
+      orderNumber: string; 
+      subtotal: number; 
+      discountAmount: number; 
+      total: number; 
+      createdAt: string; 
+      customerName?: string | null;
+      items: Array<{ productName: string; quantity: number; lineTotal: number }>; 
+      payments: Array<{ method: "cash" | "qr" | "credit"; amountReceived: number; changeAmount: number }> 
+    };
+
     try {
       const detail = await apiFetch<OrderDetail>(`/orders/${order.orderNumber}`);
       const payment = detail.payments.at(-1);
-      setReceipt({ orderNumber: detail.orderNumber, createdAt: detail.createdAt, items: detail.items, subtotal: detail.subtotal, total: detail.total, paymentMethod: payment?.method ?? "cash", amountReceived: payment?.amountReceived ?? detail.total, changeAmount: payment?.changeAmount ?? 0 });
+      const resolvedCustomerName = detail.customerName || order.customerName;
+
+      setReceipt({ 
+        orderNumber: detail.orderNumber, 
+        createdAt: detail.createdAt, 
+        items: detail.items, 
+        subtotal: detail.subtotal, 
+        discountAmount: detail.discountAmount ?? 0, 
+        total: detail.total, 
+        paymentMethod: payment?.method ?? "cash", 
+        amountReceived: payment?.amountReceived ?? detail.total, 
+        changeAmount: payment?.changeAmount ?? 0,
+        customerName: resolvedCustomerName?.trim() ? resolvedCustomerName : undefined,
+      });
     } catch (receiptError) {
       setError(errorMessage(receiptError));
     }
@@ -122,6 +145,6 @@ export default function HistoryScreen() {
       {!loading && data?.items.length === 0 && <div className="api-message">ไม่พบรายการขายในช่วงที่เลือก</div>}
       <div className="pagination"><span>แสดง {data?.items.length ? 1 : 0}-{Math.min(4, data?.items.length ?? 0)} จาก {data?.summary.orderCount ?? 0} รายการ</span><div><button aria-label="หน้าก่อนหน้า"><ChevronLeft size={17}/></button><button className="selected" aria-current="page">1</button><button>2</button><button>3</button><button aria-label="หน้าถัดไป"><ChevronRight size={17}/></button></div></div>
     </section>
-    {receipt && <ReceiptModal receipt={receipt} onClose={() => setReceipt(null)} />}
+    {receipt && <ReceiptModal receipt={receipt} autoPrint onClose={() => setReceipt(null)} />}
   </AdminShell>;
 }

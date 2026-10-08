@@ -23,6 +23,7 @@ interface OrderRow extends RowDataPacket {
   id: number;
   orderNumber: string;
   subtotal: number;
+  discountAmount: number;
   total: number;
   status: "paid" | "cancelled";
   isCredit: number;
@@ -175,6 +176,7 @@ ordersRouter.post("/", requireRoles("owner", "cashier"), asyncHandler(async (req
     employeeId?: unknown;
     paymentMethod?: unknown;
     amountReceived?: unknown;
+    discountAmount?: unknown;
     transactionReference?: unknown;
     items?: Array<{ productId?: unknown; quantity?: unknown }>;
   };
@@ -240,7 +242,7 @@ ordersRouter.post("/", requireRoles("owner", "cashier"), asyncHandler(async (req
       throw new ApiError(400, "มีสินค้าบางรายการไม่พบ ไม่มีหน่วยขาย หรือถูกปิดใช้งาน");
     }
 
-    let total = 0;
+    let subtotal = 0;
     for (const product of products) {
       const quantity = quantities.get(product.id) ?? 0;
       const quantityBase = Number((quantity * Number(product.conversionFactor)).toFixed(3));
@@ -251,9 +253,15 @@ ordersRouter.post("/", requireRoles("owner", "cashier"), asyncHandler(async (req
           requested: quantityBase,
         });
       }
-      total += Number(product.price) * quantity;
+      subtotal += Number(product.price) * quantity;
     }
-    total = Number(total.toFixed(2));
+    subtotal = Number(subtotal.toFixed(2));
+    const discountAmount = body.discountAmount === undefined ? 0 : Number(body.discountAmount);
+    if (!Number.isFinite(discountAmount) || discountAmount < 0 || discountAmount > subtotal) {
+      throw new ApiError(400, "ส่วนลดต้องอยู่ระหว่าง 0 ถึงยอดรวมสินค้า");
+    }
+    const roundedDiscount = Number(discountAmount.toFixed(2));
+    const total = Number((subtotal - roundedDiscount).toFixed(2));
 
     const amountReceived = paymentMethod === "cash"
       ? Number(body.amountReceived)
@@ -306,20 +314,26 @@ ordersRouter.post("/", requireRoles("owner", "cashier"), asyncHandler(async (req
       INSERT INTO sales (
         customer_id, cashier_id, sale_no, subtotal, discount_amount, total_amount, sale_status
       )
-      VALUES (?, ?, ?, ?, 0, ?, ?)
-    `, [customerId, cashierId, orderNumber, total, total, saleStatus]);
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `, [customerId, cashierId, orderNumber, subtotal, roundedDiscount, total, saleStatus]);
 
-    for (const product of products) {
+    let allocatedDiscount = 0;
+    for (const [index, product] of products.entries()) {
       const quantity = quantities.get(product.id) ?? 0;
       const quantityBase = Number((quantity * Number(product.conversionFactor)).toFixed(3));
       const lineTotal = Number((Number(product.price) * quantity).toFixed(2));
+      const lineDiscount = index === products.length - 1
+        ? Number((roundedDiscount - allocatedDiscount).toFixed(2))
+        : subtotal > 0 ? Number((roundedDiscount * lineTotal / subtotal).toFixed(2)) : 0;
+      allocatedDiscount = Number((allocatedDiscount + lineDiscount).toFixed(2));
+      const lineNetTotal = Number((lineTotal - lineDiscount).toFixed(2));
       const [itemResult] = await connection.execute<ResultSetHeader>(`
         INSERT INTO sale_items (
           sale_id, product_unit_id, quantity, quantity_base,
           unit_price, discount_amount, line_total
         )
-        VALUES (?, ?, ?, ?, ?, 0, ?)
-      `, [saleResult.insertId, product.productUnitId, quantity, quantityBase, product.price, lineTotal]);
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `, [saleResult.insertId, product.productUnitId, quantity, quantityBase, product.price, lineDiscount, lineNetTotal]);
       await deductStock(connection, {
         productId: product.id,
         quantityBase,
@@ -373,6 +387,8 @@ ordersRouter.post("/", requireRoles("owner", "cashier"), asyncHandler(async (req
       data: {
         id: saleResult.insertId,
         orderNumber,
+        subtotal,
+        discountAmount: roundedDiscount,
         total,
         amountReceived,
         changeAmount,
@@ -393,6 +409,7 @@ ordersRouter.get("/:orderNumber", asyncHandler(async (request, response) => {
       sale_id AS id,
       sale_no AS orderNumber,
       subtotal,
+      discount_amount AS discountAmount,
       total_amount AS total,
       CASE WHEN sale_status = 'CANCELLED' THEN 'cancelled' ELSE 'paid' END AS status,
       (sale_status = 'CREDIT') AS isCredit,
@@ -410,7 +427,7 @@ ordersRouter.get("/:orderNumber", asyncHandler(async (request, response) => {
       p.product_name AS productName,
       si.quantity,
       si.unit_price AS unitPrice,
-      si.line_total AS lineTotal
+      (si.line_total + si.discount_amount) AS lineTotal
     FROM sale_items si
     INNER JOIN product_units pu ON pu.product_unit_id = si.product_unit_id
     INNER JOIN products p ON p.product_id = pu.product_id

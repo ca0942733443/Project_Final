@@ -28,6 +28,7 @@ interface ProductRow extends RowDataPacket {
   imageUrl: string | null;
   imagePublicId: string | null;
   isActive: number;
+  soldQuantity: number;
 }
 
 interface ProductForUpdate extends RowDataPacket {
@@ -119,7 +120,8 @@ const productSelect = `
     p.reorder_point AS lowStockThreshold,
     p.image_url AS imageUrl,
     p.image_public_id AS imagePublicId,
-    p.is_active AS isActive
+    p.is_active AS isActive,
+    COALESCE(sales.soldQuantity, 0) AS soldQuantity
   FROM products p
   INNER JOIN categories c ON c.category_id = p.category_id
   LEFT JOIN sub_categories sc ON sc.sub_category_id = p.sub_category_id
@@ -137,6 +139,13 @@ const productSelect = `
     WHERE status IN ('ACTIVE', 'NEAR_EXPIRY')
     GROUP BY product_id
   ) stock ON stock.product_id = p.product_id
+  LEFT JOIN (
+    SELECT pu3.product_id, SUM(si.quantity) AS soldQuantity
+    FROM sale_items si
+    INNER JOIN sales sale ON sale.sale_id = si.sale_id AND sale.sale_status <> 'CANCELLED'
+    INNER JOIN product_units pu3 ON pu3.product_unit_id = si.product_unit_id
+    GROUP BY pu3.product_id
+  ) sales ON sales.product_id = p.product_id
 `;
 
 productsRouter.get("/", asyncHandler(async (request, response) => {
