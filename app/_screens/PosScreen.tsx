@@ -37,14 +37,14 @@ type Product = {
 
 type SubCategory = { id: number; name: string };
 type Category = { id: number; name: string; slug: string; subCategories?: SubCategory[] };
-type CreatedOrder = { 
-  orderNumber: string; 
-  subtotal: number; 
-  discountAmount: number; 
-  total: number; 
-  amountReceived: number; 
-  changeAmount: number; 
-  paymentMethod: "cash" | "qr";
+type CreatedOrder = {
+  orderNumber: string;
+  subtotal: number;
+  discountAmount: number;
+  total: number;
+  amountReceived: number;
+  changeAmount: number;
+  paymentMethod: "cash" | "qr" | "credit";
   customerName?: string;
 };
 
@@ -122,7 +122,7 @@ export default function PosScreen() {
     const matchesBrand = selectedBrand === "ALL" || brandFacet(product) === selectedBrand;
     const matchesPackage = selectedPackage === "ALL" || packageFacet(product) === selectedPackage;
     const matchesSupplier = selectedSupplier === "ALL" || (product.supplierName?.trim() || "ไม่ระบุผู้จำหน่าย") === selectedSupplier;
-    
+
     return matchesBrand && matchesPackage && matchesSupplier;
   }).slice().sort((a, b) => {
     // 🟢 1. เช็คสต็อกก่อนเลย: สินค้าหมด (<= 0) ให้ไปอยู่ท้ายสุดเสมอ
@@ -226,9 +226,9 @@ export default function PosScreen() {
   }, []);
 
   const createOrder = async (
-    method: "cash" | "qr", 
-    amountReceived: number, 
-    customerId: number | null, 
+    method: "cash" | "qr" | "credit",
+    amountReceived: number,
+    customerId: number | null,
     discountAmount: number,
     customerName?: string // รองรับชื่อลูกค้าจาก PaymentModal
   ) => {
@@ -236,9 +236,9 @@ export default function PosScreen() {
       .filter(([, quantity]) => quantity > 0)
       .map(([productId, quantity]) => {
         const product = productById.get(Number(productId));
-        return { 
-          productName: product?.name ?? "สินค้า", 
-          quantity, 
+        return {
+          productName: product?.name ?? "สินค้า",
+          quantity,
           lineTotal: (product?.price ?? 0) * quantity
         };
       });
@@ -270,15 +270,15 @@ export default function PosScreen() {
     setLastOrderNumber(order.orderNumber);
 
     // ส่งข้อมูลครบถ้วนไปยังใบเสร็จ
-    setReceipt({ 
-      orderNumber: order.orderNumber, 
-      createdAt: new Date().toISOString(), 
-      items: receiptItems, 
-      subtotal: Number(order.subtotal ?? total), 
-      discountAmount: Number(order.discountAmount ?? discountAmount), 
-      total: Number(order.total ?? finalTotal), 
+    setReceipt({
+      orderNumber: order.orderNumber,
+      createdAt: new Date().toISOString(),
+      items: receiptItems,
+      subtotal: Number(order.subtotal ?? total),
+      discountAmount: Number(order.discountAmount ?? discountAmount),
+      total: Number(order.total ?? finalTotal),
       paymentMethod: method,
-      amountReceived: order.amountReceived, 
+      amountReceived: order.amountReceived,
       changeAmount: order.changeAmount,
       customerName: customerName || order.customerName || (customerId ? "ลูกค้าสมาชิก" : "ลูกค้าทั่วไป"),
       pointsEarned: pointsEarned
@@ -296,9 +296,9 @@ export default function PosScreen() {
             <PageTitle title="เลือกสินค้า" subtitle="แตะสินค้าเพื่อเพิ่มลงในรายการ" />
             <div className="chip-row">
               {["ทั้งหมด", ...categories.map(item => item.name)].map(item => (
-                <button 
-                  className={category === item ? "selected" : ""} 
-                  onClick={() => setCategory(item)} 
+                <button
+                  className={category === item ? "selected" : ""}
+                  onClick={() => setCategory(item)}
                   key={item}
                 >
                   {item}
@@ -313,10 +313,10 @@ export default function PosScreen() {
               {visibleProducts.map(product => {
                 const isOutOfStock = product.stockQuantity <= 0;
                 return (
-                  <button 
-                    className="product-card" 
-                    disabled={isOutOfStock} 
-                    key={product.id} 
+                  <button
+                    className="product-card"
+                    disabled={isOutOfStock}
+                    key={product.id}
                     onClick={() => changeQuantity(product, 1)}
                     style={{
                       display: "flex",
@@ -329,9 +329,9 @@ export default function PosScreen() {
                     }}
                   >
                     <div className="product-image" style={{ width: "100%", height: "180px", overflow: "hidden", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <img 
-                        src={product.imageUrl ?? "/products/seasoning.png"} 
-                        alt={product.name} 
+                      <img
+                        src={product.imageUrl ?? "/products/seasoning.png"}
+                        alt={product.name}
                         style={{
                           width: "100%",
                           height: "100%",
@@ -397,19 +397,19 @@ export default function PosScreen() {
       </AdminShell>
 
       {paymentOpen && (
-        <PaymentModal 
-          orderNumber="ระบบจะสร้างเลขบิลอัตโนมัติ" 
-          total={total} 
-          onClose={() => setPaymentOpen(false)} 
-          onConfirm={createOrder} 
+        <PaymentModal
+          orderNumber="ระบบจะสร้างเลขบิลอัตโนมัติ"
+          total={total}
+          onClose={() => setPaymentOpen(false)}
+          onConfirm={createOrder}
         />
       )}
 
       {receipt && (
-        <ReceiptModal 
-          receipt={receipt} 
-          success 
-          onClose={() => setReceipt(null)} 
+        <ReceiptModal
+          receipt={receipt}
+          success
+          onClose={() => setReceipt(null)}
         />
       )}
     </>
