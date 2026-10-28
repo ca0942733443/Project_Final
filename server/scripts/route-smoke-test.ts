@@ -269,7 +269,7 @@ async function run() {
       body: JSON.stringify({
         receiptNo,
         receivedAt,
-        items: [{ itemId: inventoryOrderItem.id, quantity: 4, unitCost: 42, lotNo, expiryDate }],
+        items: [{ itemId: inventoryOrderItem.id, quantity: 4, unitCost: 42, sellingPrice: 65, lotNo, expiryDate }],
       }),
     });
     if (receivedOrder.status !== "RECEIVED" || receivedOrder.receiptNo !== receiptNo || receivedOrder.totalQuantity !== 4) {
@@ -283,6 +283,7 @@ async function run() {
         currentStock: number;
         receivedQuantity: number | null;
         receivedUnitCost: number | null;
+        sellingPrice: number;
         lotNo: string | null;
         expiryDate: string | null;
       }>;
@@ -294,11 +295,12 @@ async function run() {
       || !receivedOrderItem
       || receivedOrderItem.receivedQuantity !== 4
       || receivedOrderItem.receivedUnitCost !== 42
+      || receivedOrderItem.sellingPrice !== 65
       || receivedOrderItem.lotNo !== lotNo
       || receivedOrderItem.expiryDate !== expiryDate
       || receivedOrderItem.currentStock !== inventoryOrderItem.currentStock + 4
     ) {
-      throw new Error("PO receipt did not persist its receipt, cost, quantity, or stock movement");
+      throw new Error("PO receipt did not persist its receipt, cost, selling price, quantity, or stock movement");
     }
     let duplicateReceiptRejected = false;
     try {
@@ -307,7 +309,7 @@ async function run() {
         body: JSON.stringify({
           receiptNo,
           receivedAt,
-          items: [{ itemId: inventoryOrderItem.id, quantity: 4, unitCost: 42, lotNo, expiryDate }],
+          items: [{ itemId: inventoryOrderItem.id, quantity: 4, unitCost: 42, sellingPrice: 65, lotNo, expiryDate }],
         }),
       });
     } catch (receiptError) {

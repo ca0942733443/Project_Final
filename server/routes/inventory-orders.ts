@@ -43,6 +43,7 @@ interface InventoryOrderItemRow extends RowDataPacket {
   supplierId: number | null;
   unit: string;
   costPrice: number;
+  sellingPrice: number;
   currentStock: number;
   reorderPoint: number;
   suggestedQuantity: number;
@@ -58,6 +59,7 @@ interface InventoryOrderItemRow extends RowDataPacket {
 interface ReceivableItemRow extends RowDataPacket {
   id: number;
   productId: number;
+  productUnitId: number;
   supplierId: number | null;
   productName: string;
 }
@@ -79,9 +81,9 @@ function positiveQuantity(value: unknown) {
   return Number(quantity.toFixed(3));
 }
 
-function nonNegativeMoney(value: unknown) {
+function nonNegativeMoney(value: unknown, label = "ต้นทุนต่อหน่วย") {
   const amount = Number(value);
-  if (!Number.isFinite(amount) || amount < 0) throw new ApiError(400, "ต้นทุนต่อหน่วยต้องไม่น้อยกว่า 0");
+  if (!Number.isFinite(amount) || amount < 0) throw new ApiError(400, `${label}ต้องไม่น้อยกว่า 0`);
   return Number(amount.toFixed(2));
 }
 
@@ -246,6 +248,7 @@ inventoryOrdersRouter.get("/:id", asyncHandler(async (request, response) => {
       p.supplier_id AS supplierId,
       p.base_unit AS unit,
       p.cost_price AS costPrice,
+      COALESCE(default_unit.selling_price, 0) AS sellingPrice,
       COALESCE(stock.stockQuantity, 0) AS currentStock,
       p.reorder_point AS reorderPoint,
       ri.suggested_quantity_base AS suggestedQuantity,
@@ -259,6 +262,14 @@ inventoryOrdersRouter.get("/:id", asyncHandler(async (request, response) => {
     FROM order_recommendation_items ri
     INNER JOIN order_recommendations recommendation ON recommendation.recommendation_id = ri.recommendation_id
     INNER JOIN products p ON p.product_id = ri.product_id
+    LEFT JOIN product_units default_unit
+      ON default_unit.product_unit_id = (
+        SELECT pu.product_unit_id
+        FROM product_units pu
+        WHERE pu.product_id = p.product_id AND pu.is_active = 1
+        ORDER BY pu.is_default DESC, pu.product_unit_id ASC
+        LIMIT 1
+      )
     INNER JOIN categories c ON c.category_id = p.category_id
     LEFT JOIN suppliers s ON s.supplier_id = p.supplier_id
     LEFT JOIN goods_receipt_items gri
@@ -284,14 +295,14 @@ inventoryOrdersRouter.post("/:id/receive", asyncHandler(async (request, response
   const body = request.body as {
     receiptNo?: unknown;
     receivedAt?: unknown;
-    items?: Array<{ itemId?: unknown; quantity?: unknown; unitCost?: unknown; lotNo?: unknown; expiryDate?: unknown }>;
+    items?: Array<{ itemId?: unknown; quantity?: unknown; unitCost?: unknown; sellingPrice?: unknown; lotNo?: unknown; expiryDate?: unknown }>;
   };
   if (!Array.isArray(body.items) || body.items.length === 0) throw new ApiError(400, "กรุณาระบุสินค้าที่รับเข้า");
   const receiptNo = requiredText(body.receiptNo, "เลขที่ใบรับสินค้า", 50);
   const receivedAt = requiredDateTime(body.receivedAt);
   const receivedDate = receivedAt.slice(0, 10);
 
-  const receivedItems = new Map<number, { quantity: number; unitCost: number; lotNo: string; expiryDate: string | null }>();
+  const receivedItems = new Map<number, { quantity: number; unitCost: number; sellingPrice: number; lotNo: string; expiryDate: string | null }>();
   for (const item of body.items) {
     const itemId = Number(item.itemId);
     if (!Number.isInteger(itemId) || itemId <= 0 || receivedItems.has(itemId)) {
@@ -300,6 +311,7 @@ inventoryOrdersRouter.post("/:id/receive", asyncHandler(async (request, response
     receivedItems.set(itemId, {
       quantity: positiveQuantity(item.quantity),
       unitCost: nonNegativeMoney(item.unitCost),
+      sellingPrice: nonNegativeMoney(item.sellingPrice, "ราคาขายต่อหน่วย"),
       lotNo: requiredText(item.lotNo, "เลขล็อตสินค้า", 100),
       expiryDate: optionalDate(item.expiryDate),
     });
@@ -341,10 +353,19 @@ inventoryOrdersRouter.post("/:id/receive", asyncHandler(async (request, response
       SELECT
         ri.recommendation_item_id AS id,
         p.product_id AS productId,
+        default_unit.product_unit_id AS productUnitId,
         p.supplier_id AS supplierId,
         p.product_name AS productName
       FROM order_recommendation_items ri
       INNER JOIN products p ON p.product_id = ri.product_id AND p.is_active = 1
+      INNER JOIN product_units default_unit
+        ON default_unit.product_unit_id = (
+          SELECT pu.product_unit_id
+          FROM product_units pu
+          WHERE pu.product_id = p.product_id AND pu.is_active = 1
+          ORDER BY pu.is_default DESC, pu.product_unit_id ASC
+          LIMIT 1
+        )
       WHERE ri.recommendation_id = ?
       ORDER BY ri.recommendation_item_id
       FOR UPDATE
@@ -421,6 +442,7 @@ inventoryOrdersRouter.post("/:id/receive", asyncHandler(async (request, response
         VALUES (?, ?, 'IN', ?, ?)
       `, [batch.insertId, receivedBy, received.quantity, order.orderNumber]);
       await connection.execute("UPDATE products SET cost_price = ? WHERE product_id = ?", [received.unitCost, item.productId]);
+      await connection.execute("UPDATE product_units SET selling_price = ? WHERE product_unit_id = ?", [received.sellingPrice, item.productUnitId]);
       totalQuantity += received.quantity;
       totalCost += received.quantity * received.unitCost;
     }
