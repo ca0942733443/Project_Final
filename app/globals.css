@@ -597,7 +597,7 @@ html.dark-mode body .status-offline {
 .btn-save { padding: 8px 20px; border-radius: 8px; }
 
 /* Credit sales and receivables */
-.payment-methods-three { width: 100%; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.payment-methods.payment-methods-with-credit { width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .payment-methods-three > button { min-width: 0; height: 118px; padding-inline: 8px; }
 .payment-methods-three > button strong { font-size: 17px; }
 .payment-methods-three > .payment-method-credit { border-color: #87b9a3; }
@@ -623,7 +623,7 @@ html.dark-mode body .status-offline {
 .credit-payment-form input, .credit-payment-form select { width: 100%; min-height: 42px; padding: 0 12px; border: 1px solid var(--border); border-radius: 6px; background: #fff; }
 .credit-payment-form .wide { grid-column: 1 / -1; }
 @media (max-width: 560px) {
-  .payment-methods-three { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .payment-methods.payment-methods-with-credit { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
   .payment-methods-three > button { height: 92px; padding-inline: 4px; gap: 6px; }
   .payment-methods-three > button svg { width: 24px; height: 24px; }
   .payment-methods-three > button strong { font-size: 13px; line-height: 1.2; }

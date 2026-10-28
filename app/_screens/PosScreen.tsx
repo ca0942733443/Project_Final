@@ -45,7 +45,7 @@ type CreatedOrder = {
   total: number; 
   amountReceived: number; 
   changeAmount: number; 
-  paymentMethod: "cash" | "qr";
+  paymentMethod: "cash" | "qr" | "credit";
   customerName?: string;
 };
 
@@ -246,7 +246,7 @@ export default function PosScreen() {
   }, [loadCatalog]);
 
   const createOrder = async (
-    method: "cash" | "qr", 
+    method: "cash" | "qr" | "credit", 
     amountReceived: number, 
     customerId: number | null, 
     discountAmount: number,
