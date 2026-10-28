@@ -116,7 +116,7 @@ export default function StockScreen() {
 
       setMenuPosition({
         top: isCloseToBottom ? rect.top - menuHeight - 4 : rect.bottom + 4,
-        left: Math.min(rect.right - 130, window.innerWidth - 140),
+        left: Math.min(rect.right - 140, window.innerWidth - 150),
       });
       setActiveMenuId(id);
     }
@@ -232,7 +232,7 @@ export default function StockScreen() {
               </div>
             </button>
             <button
-              className="primary-button"
+              className="primary-button sup-primary-btn"
               onClick={() => router.push("/productmanage")}
               type="button"
             >
@@ -254,20 +254,21 @@ export default function StockScreen() {
 
       {error && <div className="api-message error stock-error-message">{error}</div>}
 
-      <section className="data-card stock-data-card">
-        <div className="table-tools stock-table-tools">
-          <div className="stock-search-wrap">
-            <Search size={18} className="stock-search-icon" />
+      <section className="data-card inventory-stock-card sup-card-section">
+        <div className="inventory-toolbar">
+          <div className="inventory-search sup-search-label" style={{ width: "100%", maxWidth: "320px", position: "relative" }}>
+            <Search size={16} className="sup-search-icon" style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "#94a3b8", pointerEvents: "none" }} />
             <input
               type="text"
               placeholder="ค้นหาชื่อสินค้า, บาร์โค้ด หรือ SKU..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="stock-search-input"
+              className="sup-search-input"
+              style={{ paddingLeft: "38px", width: "100%" }}
             />
           </div>
 
-          <div>
+          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
             <select
               aria-label="กรองผู้จำหน่าย"
               value={filterSupplier}
@@ -279,19 +280,17 @@ export default function StockScreen() {
                 <option key={supplier} value={supplier}>{supplier}</option>
               ))}
             </select>
-          </div>
 
-          <div className="stock-status-filter-wrap">
             <select
               aria-label="กรองสถานะสต็อก"
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value as typeof filterStatus)}
               className="stock-filter-select"
             >
-              <option value="ALL">สถานะทั้งหมด </option>
-              <option value="NORMAL">ปกติ </option>
-              <option value="LOW">ใกล้หมด </option>
-              <option value="OUT">หมดสต็อก </option>
+              <option value="ALL">สถานะทั้งหมด</option>
+              <option value="NORMAL">ปกติ</option>
+              <option value="LOW">ใกล้หมด</option>
+              <option value="OUT">หมดสต็อก</option>
             </select>
           </div>
         </div>
@@ -299,78 +298,80 @@ export default function StockScreen() {
         {loading ? (
           <div className="api-message">กำลังโหลดข้อมูลสต็อก...</div>
         ) : (
-          <div className="table-wrap">
-            <table className="stock-table-container">
-              <thead>
-                <tr>
-                  <th className="stock-th-left">สินค้า / SKU</th>
-                  <th className="stock-th-left">ผู้จำหน่าย</th>
-                  <th className="stock-th-right">ราคาขาย</th>
-                  <th className="stock-th-center">คงเหลือ</th>
-                  <th className="stock-th-center">จุดแจ้งเตือน</th>
-                  <th className="stock-th-center">สถานะสต็อก</th>
-                  <th className="stock-th-action">จัดการ</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredItems.map((item) => {
-                  const isLow = item.stockQuantity > 0 && item.stockQuantity <= (item.lowStockThreshold || 5);
-                  const isOut = item.stockQuantity <= 0;
-                  const isMenuOpen = activeMenuId === item.id;
+          <div className="inventory-table inventory-table-single">
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>สินค้า / SKU</th>
+                    <th>ผู้จำหน่าย</th>
+                    <th style={{ textAlign: "right" }}>ราคาขาย</th>
+                    <th style={{ textAlign: "center" }}>คงเหลือ</th>
+                    <th style={{ textAlign: "center" }}>จุดแจ้งเตือน</th>
+                    <th style={{ textAlign: "center" }}>สถานะสต็อก</th>
+                    <th className="sup-th-action"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredItems.map((item) => {
+                    const isLow = item.stockQuantity > 0 && item.stockQuantity <= (item.lowStockThreshold || 5);
+                    const isOut = item.stockQuantity <= 0;
+                    const isMenuOpen = activeMenuId === item.id;
 
-                  return (
-                    <tr key={item.id}>
-                      <td className="stock-td-left">
-                        <div className="stock-product-name">{item.name}</div>
-                        <div className="stock-product-sku">SKU: {item.sku || "-"}</div>
-                      </td>
-                      <td className="stock-td-left-muted">
-                        {item.supplierName || "ไม่ระบุ"}
-                      </td>
-                      <td className="stock-td-right-bold">
-                        ฿{Number(item.price || 0).toLocaleString("th-TH", { minimumFractionDigits: 2 })}
-                      </td>
+                    return (
+                      <tr key={item.id}>
+                        <td>
+                          <div className="stock-product-name">{item.name}</div>
+                          <div className="stock-product-sku">SKU: {item.sku || "-"}</div>
+                        </td>
+                        <td style={{ color: "#475569" }}>
+                          {item.supplierName || "ไม่ระบุ"}
+                        </td>
+                        <td style={{ textAlign: "right", fontWeight: 600 }}>
+                          ฿{Number(item.price || 0).toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+                        </td>
 
-                      <td className="stock-td-center">
-                        <span className={isOut ? "stock-badge-out" : isLow ? "stock-badge-low" : "stock-badge-normal"}>
-                          {item.stockQuantity} {item.unit || "ชิ้น"}
-                        </span>
-                      </td>
-
-                      <td className="stock-td-center-muted">
-                        {item.lowStockThreshold || 5} {item.unit || "ชิ้น"}
-                      </td>
-
-                      <td className="stock-td-center">
-                        {isOut ? (
-                          <span className="stock-pill-out">
-                            <AlertTriangle size={13} /> หมดสต็อก
+                        <td style={{ textAlign: "center" }}>
+                          <span className={isOut ? "stock-badge-out" : isLow ? "stock-badge-low" : "stock-badge-normal"}>
+                            {item.stockQuantity} {item.unit || "ชิ้น"}
                           </span>
-                        ) : isLow ? (
-                          <span className="stock-pill-low">
-                            <AlertTriangle size={13} /> สต็อกต่ำ
-                          </span>
-                        ) : (
-                          <span className="stock-pill-normal">
-                            <CheckCircle2 size={13} /> ปกติ
-                          </span>
-                        )}
-                      </td>
+                        </td>
 
-                      <td className="stock-td-center-action">
-                        <button
-                          type="button"
-                          onClick={(e) => handleToggleMenu(e, item.id)}
-                          className={isMenuOpen ? "stock-action-menu-btn-active" : "stock-action-menu-btn"}
-                        >
-                          <MoreVertical size={18} />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        <td style={{ textAlign: "center", color: "#64748b" }}>
+                          {item.lowStockThreshold || 5} {item.unit || "ชิ้น"}
+                        </td>
+
+                        <td style={{ textAlign: "center" }}>
+                          {isOut ? (
+                            <span className="stock-pill-out">
+                              <AlertTriangle size={13} /> หมดสต็อก
+                            </span>
+                          ) : isLow ? (
+                            <span className="stock-pill-low">
+                              <AlertTriangle size={13} /> สต็อกต่ำ
+                            </span>
+                          ) : (
+                            <span className="stock-pill-normal">
+                              <CheckCircle2 size={13} /> ปกติ
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="sup-td-action">
+                          <button
+                            type="button"
+                            onClick={(e) => handleToggleMenu(e, item.id)}
+                            className={`action-menu-btn ${isMenuOpen ? "active" : ""}`}
+                          >
+                            <MoreVertical size={18} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
@@ -379,10 +380,11 @@ export default function StockScreen() {
         )}
       </section>
 
+      {/* Popover เมนูจัดการ (สไตล์เดียวกับหน้า Suppliers) */}
       {mounted && activeMenuId !== null && menuPosition && activeItem && createPortal(
         <div
           ref={menuRef}
-          className="stock-popover-menu"
+          className="sup-popover-menu"
           style={{
             top: `${menuPosition.top}px`,
             left: `${menuPosition.left}px`,
@@ -390,50 +392,43 @@ export default function StockScreen() {
         >
           <button
             type="button"
-            className="stock-menu-item-btn"
+            className="menu-item-btn edit"
             onClick={() => handleOpenEdit(activeItem)}
           >
-            <Pencil size={15} className="stock-icon-blue" /> แก้ไข
+            <Pencil size={16} /> แก้ไข
           </button>
 
           <button
             type="button"
-            className="stock-menu-item-delete-btn"
+            className="menu-item-btn delete"
             onClick={() => handleOpenDelete(activeItem)}
           >
-            <Trash2 size={15} /> ลบสินค้า
+            <Trash2 size={16} /> ลบสินค้า
           </button>
         </div>,
         document.body
       )}
 
-      {deletingItem && (
-        <div
-          className="stock-modal-overlay"
-          onClick={() => !deleting && setDeletingItem(null)}
-        >
-          <div
-            className="stock-delete-modal-box"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="stock-delete-icon-wrap">
-              <Trash2 size={24} />
+      {/* Modal ยืนยันการลบ (ใช้สไตล์ sup-modal) */}
+      {mounted && deletingItem && createPortal(
+        <div className="sup-modal-overlay" onClick={() => !deleting && setDeletingItem(null)}>
+          <div className="sup-modal-box" onClick={(e) => e.stopPropagation()}>
+            <div className="sup-modal-icon-wrap">
+              <AlertTriangle size={24} />
             </div>
 
-            <h3 className="stock-delete-title">
-              ยืนยันการลบสินค้า
-            </h3>
+            <h3 className="sup-modal-title">ยืนยันการลบสินค้า</h3>
 
-            <p className="stock-delete-text">
-              คุณต้องการลบสินค้า <strong className="stock-delete-text-highlight">"{deletingItem.name}"</strong> ใช่หรือไม่? การดำเนินการนี้ไม่สามารถยกเลิกได้
+            <p className="sup-modal-desc">
+              คุณต้องการลบสินค้า <strong>"{deletingItem.name}"</strong> ใช่หรือไม่? การดำเนินการนี้ไม่สามารถยกเลิกได้
             </p>
 
-            <div className="stock-modal-action-group">
+            <div className="sup-modal-actions">
               <button
                 type="button"
                 disabled={deleting}
                 onClick={() => setDeletingItem(null)}
-                className="stock-cancel-btn"
+                className="sup-btn-cancel"
               >
                 ยกเลิก
               </button>
@@ -441,26 +436,26 @@ export default function StockScreen() {
                 type="button"
                 disabled={deleting}
                 onClick={() => void handleConfirmDelete()}
-                className="stock-confirm-delete-btn"
+                className="sup-btn-delete"
               >
                 {deleting ? "กำลังลบ..." : "ลบสินค้า"}
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {editingItem && (
-        <div
-          className="stock-modal-overlay"
-          onClick={() => setEditingItem(null)}
-        >
+      {/* Modal แก้ไขข้อมูลสินค้า */}
+      {editingItem && createPortal(
+        <div className="sup-modal-overlay" onClick={() => setEditingItem(null)}>
           <div
-            className="stock-edit-modal-box"
+            className="sup-modal-box"
+            style={{ textAlign: "left", maxWidth: "480px" }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="stock-edit-modal-header">
-              <h3 className="stock-edit-modal-title">
+            <div className="stock-edit-modal-header" style={{ marginBottom: "16px" }}>
+              <h3 className="sup-modal-title" style={{ margin: 0 }}>
                 แก้ไขข้อมูลสินค้า
               </h3>
               <button
@@ -475,77 +470,70 @@ export default function StockScreen() {
             <form onSubmit={handleSaveEdit}>
               <div className="stock-edit-form-body">
                 <div>
-                  <label className="stock-form-label">
-                    ชื่อสินค้า
-                  </label>
+                  <label className="sup-form-label">ชื่อสินค้า</label>
                   <input
                     type="text"
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
                     required
-                    className="stock-form-input"
+                    className="sup-input"
                   />
                 </div>
 
-                <div className="stock-grid-2col">
+                <div className="sup-grid-2col">
                   <div>
-                    <label className="stock-form-label">
-                      ราคาขาย (บาท)
-                    </label>
+                    <label className="sup-form-label">ราคาขาย (บาท)</label>
                     <input
                       type="number"
                       value={editPrice}
                       onChange={(e) => setEditPrice(e.target.value === "" ? "" : Number(e.target.value))}
-                      className="stock-form-input"
+                      className="sup-input"
                     />
                   </div>
 
                   <div>
-                    <label className="stock-form-label">
-                      จำนวนสต็อก
-                    </label>
+                    <label className="sup-form-label">จำนวนสต็อก</label>
                     <input
                       type="number"
                       value={editStock}
                       onChange={(e) => setEditStock(e.target.value === "" ? "" : Number(e.target.value))}
-                      className="stock-form-input"
+                      className="sup-input"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="stock-form-label">
-                    หน่วยนับ
-                  </label>
+                  <label className="sup-form-label">หน่วยนับ</label>
                   <input
                     type="text"
                     value={editUnit}
                     onChange={(e) => setEditUnit(e.target.value)}
                     placeholder="เช่น ชิ้น, แพ็ค, ถุง"
-                    className="stock-form-input"
+                    className="sup-input"
                   />
                 </div>
               </div>
 
-              <div className="stock-edit-form-footer">
+              <div className="sup-form-footer" style={{ marginTop: "20px" }}>
                 <button
                   type="button"
                   onClick={() => setEditingItem(null)}
-                  className="stock-small-cancel-btn"
+                  className="sup-btn-cancel"
                 >
                   ยกเลิก
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="stock-save-submit-btn"
+                  className="sup-btn-submit"
                 >
                   {saving ? "กำลังบันทึก..." : "บันทึกการแก้ไข"}
                 </button>
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </AdminShell>
   );

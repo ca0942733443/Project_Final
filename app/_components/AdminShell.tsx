@@ -27,9 +27,8 @@ export const THEME_STORAGE_KEY = "captain-gai-sod-theme";
 export type AdminSection =
   | "dashboard"
   | "pos"
-  | "products"
   | "suppliers"
-  | "stock" // 🟢 เพิ่มประเภท stock
+  | "stock"
   | "inventory"
   | "inventory-orders"
   | "recommendations"
@@ -45,10 +44,9 @@ export type AdminSection =
 const navigation = [
   ["dashboard", "แดชบอร์ดสรุปรายได้", LayoutDashboard, "/"],
   ["pos", "หน้าจอขายหน้าร้าน", Store, "/pos"],
-  ["products", "จัดการสินค้า", PackagePlus, "/products"],
-  ["suppliers", "จัดการ Supplier", Truck, "/suppliers"],
-  ["stock", "จัดการสต็อก", Warehouse, "/stock"], // 🟢 เพิ่มเมนู "จัดการสต็อก" ตรงนี้
-  ["inventory", "คลังสินค้า & สต็อกสินค้า", Boxes, "/inventory"],
+  ["suppliers", "จัดการผู้จำหน่าย", Truck, "/suppliers"],
+  ["stock", "จัดการสต็อก", Warehouse, "/stock"],
+  // ["inventory", "คลังสินค้า & สต็อกสินค้า", Boxes, "/inventory"],
   ["inventory-orders", "คำสั่งซื้อสินค้าคงคลัง", ClipboardList, "/inventory-orders"],
   ["recommendations", "ระบบแนะนำการสั่งซื้อ", Lightbulb, "/recommendations"],
   ["customers", "บัญชีขายเชื่อ & ลูกค้าประจำ", WalletCards, "/customers"],

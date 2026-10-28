@@ -43,7 +43,7 @@ export default function ReceiptModal({ receipt, success = false, autoPrint = fal
             <p>ธุรกรรมเสร็จสิ้นเรียบร้อยแล้ว</p>
           </header>
         )}
-
+        
         <div className="receipt-content" id="printable-receipt">
           <div className="receipt-brand">
             <strong>CAPTAIN GAI SOD</strong>
@@ -83,13 +83,8 @@ export default function ReceiptModal({ receipt, success = false, autoPrint = fal
 
           <div className="receipt-payment">
             <span>ช่องทางชำระ<b>{paymentLabels[receipt.paymentMethod]}</b></span>
-            {receipt.paymentMethod === "credit" ? <>
-              <span>สถานะ<b>ยังไม่ชำระ</b></span>
-              <span>ยอดค้างชำระ<b>฿{Number(receipt.total ?? 0).toFixed(2)}</b></span>
-            </> : <>
-              <span>รับเงินมา<b>฿{Number(receipt.amountReceived ?? 0).toFixed(2)}</b></span>
-              <span>เงินทอน<b>฿{Number(receipt.changeAmount ?? 0).toFixed(2)}</b></span>
-            </>}
+            <span>รับเงินมา<b>฿{Number(receipt.amountReceived ?? 0).toFixed(2)}</b></span>
+            <span>เงินทอน<b>฿{Number(receipt.changeAmount ?? 0).toFixed(2)}</b></span>
           </div>
 
           {receipt.pointsEarned !== undefined && receipt.pointsEarned > 0 && (

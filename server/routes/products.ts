@@ -11,6 +11,7 @@ interface ProductRow extends RowDataPacket {
   id: number;
   sku: string;
   name: string;
+  packageSize: string | null;
   categoryId: number;
   categoryName: string;
   subCategoryId: number | null;
@@ -46,6 +47,7 @@ interface ProductForUpdate extends RowDataPacket {
 type ProductInput = {
   sku?: unknown;
   name?: unknown;
+  packageSize?: unknown;
   categoryId?: unknown;
   subCategoryId?: unknown;
   price?: unknown;
@@ -101,6 +103,7 @@ const productSelect = `
     p.product_id AS id,
     p.sku,
     p.product_name AS name,
+    p.package_size AS packageSize,
     p.category_id AS categoryId,
     c.category_name AS categoryName,
     p.sub_category_id AS subCategoryId,
@@ -210,6 +213,7 @@ productsRouter.post("/", asyncHandler(async (request, response) => {
   const costPrice = nonNegativeNumber(body.costPrice, "ราคาทุน", 0);
   const barcode = optionalText(body.barcode, 100);
   const description = optionalText(body.description, 65535);
+  const packageSize = optionalText(body.packageSize, 100);
   const unit = (typeof body.unit === "string" && body.unit.trim() !== "") ? body.unit.trim() : "ชิ้น";
   const stockQuantity = nonNegativeNumber(body.stockQuantity, "จำนวนคงเหลือ", 0);
   const reorderPoint = nonNegativeNumber(body.lowStockThreshold, "จุดแจ้งเตือนสต็อก", 0);
@@ -247,16 +251,17 @@ productsRouter.post("/", asyncHandler(async (request, response) => {
 
     const [result] = await connection.execute<ResultSetHeader>(`
       INSERT INTO products (
-        category_id, sub_category_id, supplier_id, sku, product_name, description, cost_price, base_unit, reorder_point,
+        category_id, sub_category_id, supplier_id, sku, product_name, package_size, description, cost_price, base_unit, reorder_point,
         image_url, image_public_id, is_active
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
     `, [
       finalCategoryId,
       selectedSubCategoryId,
       selectedSupplierId,
       sku,
       name,
+      packageSize,
       description,
       costPrice,
       unit,
@@ -345,6 +350,7 @@ productsRouter.patch("/:id", asyncHandler(async (request, response) => {
 
     if (body.sku !== undefined) setProduct("sku", requiredText(body.sku, "SKU"));
     if (body.name !== undefined) setProduct("product_name", requiredText(body.name, "ชื่อสินค้า"));
+    if (body.packageSize !== undefined) setProduct("package_size", optionalText(body.packageSize, 100));
     if (body.categoryId !== undefined) setProduct("category_id", categoryId(body.categoryId));
     if (body.subCategoryId !== undefined) setProduct("sub_category_id", optionalId(body.subCategoryId, "รหัสหมวดหมู่ย่อย"));
     if (body.description !== undefined) setProduct("description", optionalText(body.description, 65535));

@@ -318,8 +318,12 @@ export default function ProductManageScreen() {
             <table>
               <thead>
                 <tr>
-                  <th style={{ textAlign: "left" }}>บาร์โค้ด / SKU / รูป</th>
-                  <th style={{ textAlign: "left" }}>ชื่อสินค้า</th>
+                  <th style={{ textAlign: "left" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                      <div style={{ width: "55px", flexShrink: 0 }} />
+                      <span>ชื่อสินค้า</span>
+                    </div>
+                  </th>
                   <th style={{ textAlign: "left" }}>หมวดหมู่</th>
                   <th style={{ textAlign: "right" }}>ราคาทุน</th>
                   <th style={{ textAlign: "right" }}>ราคาขาย</th>
@@ -330,13 +334,13 @@ export default function ProductManageScreen() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={7} style={{ textAlign: "center", padding: "32px", color: "#64748b" }}>
+                    <td colSpan={6} style={{ textAlign: "center", padding: "32px", color: "#64748b" }}>
                       กำลังโหลดข้อมูลสินค้า...
                     </td>
                   </tr>
                 ) : filteredProducts.length === 0 ? (
                   <tr>
-                    <td colSpan={7} style={{ textAlign: "center", padding: "32px", color: "#64748b" }}>
+                    <td colSpan={6} style={{ textAlign: "center", padding: "32px", color: "#64748b" }}>
                       ไม่พบรายการสินค้าที่ค้นหา
                     </td>
                   </tr>
@@ -378,18 +382,10 @@ export default function ProductManageScreen() {
                                 <Package size={20} />
                               </div>
                             )}
-                            <div>
-                              <div style={{ fontWeight: "600", color: "#0f172a", fontSize: "13px" }}>
-                                {prod.barcode || "-"}
-                              </div>
-                              <div style={{ fontSize: "12px", color: "#94a3b8" }}>
-                                SKU: {prod.sku || "-"}
-                              </div>
-                            </div>
+                            <span style={{ fontWeight: "600", color: "#0f172a", fontSize: "14px" }}>
+                              {displayName}
+                            </span>
                           </div>
-                        </td>
-                        <td style={{ textAlign: "left", fontWeight: "600", color: "#0f172a", fontSize: "14px" }}>
-                          {displayName}
                         </td>
                         <td style={{ textAlign: "left", color: "#475569", fontSize: "14px" }}>
                           {prod.categoryName || "ทั่วไป"}

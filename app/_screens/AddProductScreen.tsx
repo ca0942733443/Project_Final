@@ -23,11 +23,6 @@ type CategoryItem = {
   sub_categories?: SubCategoryItem[];
 };
 
-type SupplierItem = {
-  id: number;
-  name: string;
-};
-
 const generateRandomSKU = () => {
   const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   let randomLetters = "";
@@ -47,11 +42,10 @@ function AddProductForm({ parentId, onBack }: AddProductScreenProps) {
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [selectedSubCategoryId, setSelectedSubCategoryId] = useState("");
-  const [suppliers, setSuppliers] = useState<SupplierItem[]>([]);
-  const [selectedSupplierId, setSelectedSupplierId] = useState("");
 
-  // --- ข้อมูลสินค้า ---
-  const [name, setName] = useState("");
+  // --- ข้อมูลสินค้า (แยก ชื่อสินค้า/ยี่ห้อ กับ ขนาดบรรจุ) ---
+  const [productBrandName, setProductBrandName] = useState("");
+  const [packageSize, setPackageSize] = useState("");
   const [sku, setSku] = useState("");
   const [barcode, setBarcode] = useState("");
   const [description, setDescription] = useState("");
@@ -63,7 +57,7 @@ function AddProductForm({ parentId, onBack }: AddProductScreenProps) {
   const [price, setPrice] = useState("");
   const [unit, setUnit] = useState("ชิ้น");
   const [stockQuantity, setStockQuantity] = useState("");
-
+  
   // --- การแจ้งเตือนสต็อก ---
   const [enableNotification, setEnableNotification] = useState(true);
   const [lowStockThreshold, setLowStockThreshold] = useState("5");
@@ -74,7 +68,7 @@ function AddProductForm({ parentId, onBack }: AddProductScreenProps) {
   const [error, setError] = useState("");
 
   const unitOptions = [
-    "ชิ้น", "กิโลกรัม", "ถุง", "แพ็ค", "กล่อง",
+    "ชิ้น", "กิโลกรัม", "ถุง", "แพ็ค", "กล่อง", 
     "โหล", "ขวด", "กระป๋อง", "ลิตร", "ตัว", "ชุด",
   ];
 
@@ -89,18 +83,6 @@ function AddProductForm({ parentId, onBack }: AddProductScreenProps) {
       }
     };
     void fetchCategories();
-  }, []);
-
-  useEffect(() => {
-    const fetchSuppliers = async () => {
-      try {
-        const data = await apiFetch<SupplierItem[]>("/suppliers");
-        setSuppliers(data);
-      } catch (err) {
-        console.error("Failed to load suppliers:", err);
-      }
-    };
-    void fetchSuppliers();
   }, []);
 
   const handleRandomizeSKU = useCallback(() => {
@@ -122,9 +104,16 @@ function AddProductForm({ parentId, onBack }: AddProductScreenProps) {
         try {
           const res = await apiFetch<any>(`/products/${editId}`);
           const data = res?.data || res;
-
+          
           if (data) {
-            setName(data.product_name || data.name || "");
+            const rawName = data.product_name || data.name || "";
+            const savedPackageSize = data.packageSize || data.package_size || "";
+            const packageSuffix = savedPackageSize ? ` ${savedPackageSize}` : "";
+            setProductBrandName(packageSuffix && rawName.endsWith(packageSuffix)
+              ? rawName.slice(0, -packageSuffix.length).trim()
+              : rawName);
+            setPackageSize(savedPackageSize);
+
             setSku(data.sku || "");
             setBarcode(data.barcode || data.code || "");
             setDescription(data.description || "");
@@ -136,17 +125,6 @@ function AddProductForm({ parentId, onBack }: AddProductScreenProps) {
             }
             if (data.sub_category_id || data.subCategoryId) {
               setSelectedSubCategoryId(String(data.sub_category_id || data.subCategoryId));
-            }
-
-            // หากมี supplier_id ให้ใส่ค่านั้น หากไม่มี ให้หา ID ของ "ผู้จำหน่ายทั่วไป"
-            const currentSupplierId = data.supplier_id || data.supplierId;
-            if (currentSupplierId) {
-              setSelectedSupplierId(String(currentSupplierId));
-            } else {
-              const defaultSupplier = suppliers.find((s) => s.name.includes("ทั่วไป"));
-              if (defaultSupplier) {
-                setSelectedSupplierId(String(defaultSupplier.id));
-              }
             }
 
             const costVal = data.cost_price ?? data.costPrice;
@@ -162,7 +140,7 @@ function AddProductForm({ parentId, onBack }: AddProductScreenProps) {
 
             const reorderVal = data.reorder_point ?? data.lowStockThreshold;
             setLowStockThreshold(reorderVal !== undefined && reorderVal !== null ? String(reorderVal) : "5");
-
+            
             if (data.is_notify !== undefined) setEnableNotification(Boolean(data.is_notify));
           }
         } catch (err) {
@@ -173,7 +151,7 @@ function AddProductForm({ parentId, onBack }: AddProductScreenProps) {
       };
       void fetchProductDetail();
     }
-  }, [editId, suppliers]);
+  }, [editId]);
 
   const activeMainCategory = categories.find(
     (c) => String(c.id) === selectedCategoryId
@@ -213,8 +191,8 @@ function AddProductForm({ parentId, onBack }: AddProductScreenProps) {
       setError("กรุณาเลือกหมวดหมู่หลัก");
       return;
     }
-    if (!name.trim()) {
-      setError("กรุณากรอกชื่อสินค้า / ยี่ห้อ / รุ่น");
+    if (!productBrandName.trim()) {
+      setError("กรุณากรอกชื่อสินค้า / ยี่ห้อ");
       return;
     }
     if (!barcode.trim()) {
@@ -229,19 +207,17 @@ function AddProductForm({ parentId, onBack }: AddProductScreenProps) {
     setSaving(true);
     setError("");
 
-    // หา ID ของผู้จำหน่ายทั่วไป กรณีที่ไม่ได้เลือกผู้จำหน่ายเจาะจง
-    const defaultSupplier = suppliers.find((s) => s.name.includes("ทั่วไป"));
-    const finalSupplierId = selectedSupplierId
-      ? Number(selectedSupplierId)
-      : defaultSupplier
-      ? defaultSupplier.id
-      : null;
+    // รวมชื่อสินค้าและขนาดบรรจุเข้าด้วยกัน
+    const fullName = packageSize.trim()
+      ? `${productBrandName.trim()} ${packageSize.trim()}`
+      : productBrandName.trim();
 
     const payload = {
-      name: name.trim(),
+      name: fullName,
+      packageSize: packageSize.trim(),
       categoryId: Number(selectedCategoryId),
       subCategoryId: selectedSubCategoryId ? Number(selectedSubCategoryId) : null,
-      supplierId: finalSupplierId,
+      supplierId: null,
       sku: sku.trim().toUpperCase(),
       barcode: barcode.trim(),
       description: description.trim() || null,
@@ -281,7 +257,7 @@ function AddProductForm({ parentId, onBack }: AddProductScreenProps) {
   if (loadingData) {
     return (
       <AdminShell active="productmanage">
-        <div style={{ padding: "40px", textAlign: "center", color: "#64748b" }}>
+        <div className="ap-loading-container">
           กำลังโหลดข้อมูลสินค้า...
         </div>
       </AdminShell>
@@ -290,103 +266,46 @@ function AddProductForm({ parentId, onBack }: AddProductScreenProps) {
 
   return (
     <AdminShell active="productmanage">
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: "24px",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-          <button
-            type="button"
-            onClick={handleBack}
-            style={{
-              width: "42px",
-              height: "42px",
-              borderRadius: "10px",
-              backgroundColor: "#ffffff",
-              border: "1px solid #e2e8f0",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "#0f172a",
-              cursor: "pointer",
-            }}
-          >
+      <div className="ap-header">
+        <div className="ap-header-left">
+          <button type="button" onClick={handleBack} className="ap-back-button">
             <ArrowLeft size={20} />
           </button>
           <div>
-            <h1 style={{ fontSize: "22px", fontWeight: "700", color: "#0f172a", margin: 0 }}>
-              {editId ? `แก้ไขสินค้า: ${name}` : "เพิ่มสินค้าใหม่"}
+            <h1 className="ap-title">
+              {editId ? `แก้ไขสินค้า: ${productBrandName}` : "เพิ่มสินค้าใหม่"}
             </h1>
-            <p style={{ fontSize: "14px", color: "#64748b", margin: "4px 0 0 0" }}>
+            <p className="ap-subtitle">
               กรอกข้อมูลสินค้า หมวดหมู่ ราคา และจำนวนสต็อก
             </p>
           </div>
         </div>
       </div>
 
-      <form
-        onSubmit={handleSubmit}
-        style={{
-          maxWidth: "880px",
-          display: "flex",
-          flexDirection: "column",
-          gap: "24px",
-        }}
-      >
+      <form onSubmit={handleSubmit} className="ap-form">
         {error && (
-          <div
-            style={{
-              padding: "12px 16px",
-              backgroundColor: "#fef2f2",
-              border: "1px solid #fecaca",
-              color: "#dc2626",
-              borderRadius: "10px",
-              fontSize: "14px",
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-            }}
-          >
+          <div className="ap-alert-error">
             <AlertCircle size={18} />
             <span>{error}</span>
           </div>
         )}
 
         {/* SECTION 1: ข้อมูลสินค้า */}
-        <div
-          style={{
-            backgroundColor: "#ffffff",
-            borderRadius: "16px",
-            padding: "24px",
-            border: "1px solid #f1f5f9",
-          }}
-        >
-          <h3 style={{ margin: "0 0 16px 0", fontSize: "16px", fontWeight: "700", color: "#0f172a" }}>
+        <div className="ap-section-card">
+          <h3 className="ap-section-title">
             1. ข้อมูลสินค้า
           </h3>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
+          <div className="ap-grid-2col">
             <div>
-              <label style={{ display: "block", fontSize: "14px", fontWeight: "600", color: "#334155", marginBottom: "6px" }}>
-                หมวดหมู่หลัก <span style={{ color: "#ef4444" }}>*</span>
+              <label className="ap-label">
+                หมวดหมู่หลัก <span className="ap-required">*</span>
               </label>
               <select
                 value={selectedCategoryId}
                 onChange={handleMainCategoryChange}
                 required
-                style={{
-                  width: "100%",
-                  padding: "10px 12px",
-                  borderRadius: "8px",
-                  border: "1px solid #cbd5e1",
-                  fontSize: "14px",
-                  backgroundColor: "#ffffff",
-                  outline: "none",
-                }}
+                className="ap-select"
               >
                 <option value="">-- เลือกหมวดหมู่หลัก --</option>
                 {categories.map((cat) => (
@@ -398,22 +317,14 @@ function AddProductForm({ parentId, onBack }: AddProductScreenProps) {
             </div>
 
             <div>
-              <label style={{ display: "block", fontSize: "14px", fontWeight: "600", color: "#334155", marginBottom: "6px" }}>
+              <label className="ap-label">
                 หมวดหมู่ย่อย
               </label>
               <select
                 value={selectedSubCategoryId}
                 onChange={(e) => setSelectedSubCategoryId(e.target.value)}
                 disabled={!selectedCategoryId}
-                style={{
-                  width: "100%",
-                  padding: "10px 12px",
-                  borderRadius: "8px",
-                  border: "1px solid #cbd5e1",
-                  fontSize: "14px",
-                  backgroundColor: !selectedCategoryId ? "#f8fafc" : "#ffffff",
-                  outline: "none",
-                }}
+                className="ap-select"
               >
                 <option value="">-- เลือกหมวดหมู่ย่อย --</option>
                 {availableSubCategories.map((sub) => (
@@ -425,90 +336,54 @@ function AddProductForm({ parentId, onBack }: AddProductScreenProps) {
             </div>
           </div>
 
-          <div style={{ marginBottom: "16px" }}>
-            <label style={{ display: "block", fontSize: "14px", fontWeight: "600", color: "#334155", marginBottom: "6px" }}>
-              ผู้จำหน่าย
-            </label>
-            <select
-              value={selectedSupplierId}
-              onChange={(e) => setSelectedSupplierId(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "10px 12px",
-                borderRadius: "8px",
-                border: "1px solid #cbd5e1",
-                fontSize: "14px",
-                backgroundColor: "#ffffff",
-                outline: "none",
-              }}
-            >
-              {/* ตัวเลือกเริ่มต้นแบบไม่มีเครื่องหมายขีด */}
-              <option value="">ผู้จำหน่ายทั่วไป</option>
-
-              {/* กรอง "ผู้จำหน่ายทั่วไป" ออกเพื่อไม่ให้แสดงซ้ำข้างล่าง */}
-              {suppliers
-                .filter((supplier) => !supplier.name.includes("ผู้จำหน่ายทั่วไป"))
-                .map((supplier) => (
-                  <option key={supplier.id} value={supplier.id}>
-                    {supplier.name}
-                  </option>
-                ))}
-            </select>
-          </div>
-
-          <div style={{ marginBottom: "16px" }}>
-            <label style={{ display: "block", fontSize: "14px", fontWeight: "600", color: "#334155", marginBottom: "6px" }}>
-              ชื่อสินค้า / ยี่ห้อ / รุ่น <span style={{ color: "#ef4444" }}>*</span>
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="เช่น น้ำตาลทรายแดง ตราดาว 1 กก."
-              required
-              style={{
-                width: "100%",
-                padding: "10px 12px",
-                borderRadius: "8px",
-                border: "1px solid #cbd5e1",
-                fontSize: "14px",
-              }}
-            />
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
+          {/* ช่องกรอกชื่อสินค้า / ยี่ห้อ และ ขนาดบรรจุ แยกจากกัน */}
+          <div className="ap-grid-2col">
             <div>
-              <label style={{ display: "block", fontSize: "14px", fontWeight: "600", color: "#334155", marginBottom: "6px" }}>
+              <label className="ap-label">
+                ชื่อสินค้า / ยี่ห้อ <span className="ap-required">*</span>
+              </label>
+              <input
+                type="text"
+                value={productBrandName}
+                onChange={(e) => setProductBrandName(e.target.value)}
+                placeholder="เช่น น้ำตาลทรายแดง ตราดาว"
+                required
+                className="ap-input"
+              />
+            </div>
+
+            <div>
+              <label className="ap-label">
+                ขนาดบรรจุ
+              </label>
+              <input
+                type="text"
+                value={packageSize}
+                onChange={(e) => setPackageSize(e.target.value)}
+                placeholder="เช่น 1 กก. หรือ 72 กรัม"
+                className="ap-input"
+              />
+            </div>
+          </div>
+
+          <div className="ap-grid-2col">
+            <div>
+              <label className="ap-label">
                 รหัส SKU
               </label>
-              <div style={{ display: "flex", gap: "8px" }}>
+              <div className="ap-sku-wrapper">
                 <input
                   type="text"
                   value={sku}
                   onChange={(e) => setSku(e.target.value.toUpperCase())}
                   placeholder="เช่น HUK-33342"
-                  style={{
-                    width: "100%",
-                    padding: "10px 12px",
-                    borderRadius: "8px",
-                    border: "1px solid #cbd5e1",
-                    fontSize: "14px",
-                    fontWeight: "600",
-                    textTransform: "uppercase",
-                    backgroundColor: "#f8fafc",
-                  }}
+                  className="ap-input ap-input-sku"
                 />
                 <button
                   type="button"
                   onClick={handleRandomizeSKU}
                   title="สุ่ม SKU"
-                  style={{
-                    padding: "0 12px",
-                    backgroundColor: "#ffffff",
-                    border: "1px solid #cbd5e1",
-                    borderRadius: "8px",
-                    cursor: "pointer",
-                  }}
+                  className="ap-btn-random-sku"
                 >
                   <RefreshCw size={16} />
                 </button>
@@ -516,8 +391,8 @@ function AddProductForm({ parentId, onBack }: AddProductScreenProps) {
             </div>
 
             <div>
-              <label style={{ display: "block", fontSize: "14px", fontWeight: "600", color: "#334155", marginBottom: "6px" }}>
-                บาร์โค้ด <span style={{ color: "#ef4444" }}>*</span>
+              <label className="ap-label">
+                บาร์โค้ด <span className="ap-required">*</span>
               </label>
               <input
                 type="text"
@@ -525,19 +400,13 @@ function AddProductForm({ parentId, onBack }: AddProductScreenProps) {
                 onChange={(e) => setBarcode(e.target.value)}
                 placeholder="เช่น 8850123456789"
                 required
-                style={{
-                  width: "100%",
-                  padding: "10px 12px",
-                  borderRadius: "8px",
-                  border: "1px solid #cbd5e1",
-                  fontSize: "14px",
-                }}
+                className="ap-input"
               />
             </div>
           </div>
 
-          <div style={{ marginBottom: "16px" }}>
-            <label style={{ display: "block", fontSize: "14px", fontWeight: "600", color: "#334155", marginBottom: "6px" }}>
+          <div className="ap-field-group">
+            <label className="ap-label">
               รายละเอียดสินค้าเพิ่มเติม
             </label>
             <textarea
@@ -545,29 +414,20 @@ function AddProductForm({ parentId, onBack }: AddProductScreenProps) {
               onChange={(e) => setDescription(e.target.value)}
               placeholder="กรอกรายละเอียดเพิ่มเติมเกี่ยวกับสินค้า..."
               rows={3}
-              style={{
-                width: "100%",
-                padding: "10px 12px",
-                borderRadius: "8px",
-                border: "1px solid #cbd5e1",
-                fontSize: "14px",
-                fontFamily: "inherit",
-                resize: "vertical",
-                boxSizing: "border-box",
-              }}
+              className="ap-textarea"
             />
           </div>
 
           <div>
-            <label style={{ display: "block", fontSize: "14px", fontWeight: "600", color: "#334155", marginBottom: "6px" }}>
+            <label className="ap-label">
               รูปภาพสินค้า (image_url)
             </label>
             {imagePreview ? (
-              <div style={{ position: "relative", width: "120px", height: "120px" }}>
+              <div className="ap-image-preview-container">
                 <img
                   src={imagePreview}
                   alt="Preview"
-                  style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "10px", border: "1px solid #e2e8f0" }}
+                  className="ap-image-preview-img"
                 />
                 <button
                   type="button"
@@ -575,61 +435,30 @@ function AddProductForm({ parentId, onBack }: AddProductScreenProps) {
                     setImagePreview(null);
                     setImageChanged(true);
                   }}
-                  style={{
-                    position: "absolute",
-                    top: "-8px",
-                    right: "-8px",
-                    backgroundColor: "#ef4444",
-                    color: "#fff",
-                    border: "none",
-                    borderRadius: "50%",
-                    width: "24px",
-                    height: "24px",
-                    cursor: "pointer",
-                  }}
+                  className="ap-btn-remove-image"
                 >
                   <X size={14} />
                 </button>
               </div>
             ) : (
-              <label
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  width: "140px",
-                  height: "120px",
-                  border: "2px dashed #cbd5e1",
-                  borderRadius: "10px",
-                  backgroundColor: "#f8fafc",
-                  cursor: "pointer",
-                }}
-              >
-                <ImagePlus size={28} style={{ color: "#94a3b8", marginBottom: "4px" }} />
-                <span style={{ fontSize: "12px", color: "#64748b" }}>เพิ่มรูปสินค้า</span>
-                <input type="file" accept="image/*" onChange={handleImageChange} style={{ display: "none" }} />
+              <label className="ap-image-upload-label">
+                <ImagePlus size={28} className="ap-image-upload-icon" />
+                <span className="ap-image-upload-text">เพิ่มรูปสินค้า</span>
+                <input type="file" accept="image/*" onChange={handleImageChange} className="ap-hidden-file-input" />
               </label>
             )}
           </div>
         </div>
 
         {/* SECTION 2: ราคาและจำนวนสต็อก */}
-        <div
-          style={{
-            backgroundColor: "#ffffff",
-            borderRadius: "16px",
-            padding: "24px",
-            border: "1px solid #f1f5f9",
-          }}
-        >
-          <h3 style={{ margin: "0 0 16px 0", fontSize: "16px", fontWeight: "700", color: "#0f172a" }}>
+        <div className="ap-section-card">
+          <h3 className="ap-section-title">
             2. ราคาและจำนวนสต็อก
           </h3>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
+          <div className="ap-grid-2col">
             <div>
-              <label style={{ display: "block", fontSize: "14px", fontWeight: "600", color: "#334155", marginBottom: "6px" }}>
+              <label className="ap-label">
                 ราคาทุน (บาท)
               </label>
               <input
@@ -638,19 +467,13 @@ function AddProductForm({ parentId, onBack }: AddProductScreenProps) {
                 value={costPrice}
                 onChange={(e) => setCostPrice(e.target.value)}
                 placeholder="0.00"
-                style={{
-                  width: "100%",
-                  padding: "10px 12px",
-                  borderRadius: "8px",
-                  border: "1px solid #cbd5e1",
-                  fontSize: "14px",
-                }}
+                className="ap-input"
               />
             </div>
 
             <div>
-              <label style={{ display: "block", fontSize: "14px", fontWeight: "600", color: "#334155", marginBottom: "6px" }}>
-                ราคาขาย (บาท) <span style={{ color: "#ef4444" }}>*</span>
+              <label className="ap-label">
+                ราคาขาย (บาท) <span className="ap-required">*</span>
               </label>
               <input
                 type="number"
@@ -659,34 +482,21 @@ function AddProductForm({ parentId, onBack }: AddProductScreenProps) {
                 onChange={(e) => setPrice(e.target.value)}
                 placeholder="0.00"
                 required
-                style={{
-                  width: "100%",
-                  padding: "10px 12px",
-                  borderRadius: "8px",
-                  border: "1px solid #cbd5e1",
-                  fontSize: "14px",
-                }}
+                className="ap-input"
               />
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+          <div className="ap-grid-2col" style={{ marginBottom: 0 }}>
             <div>
-              <label style={{ display: "block", fontSize: "14px", fontWeight: "600", color: "#334155", marginBottom: "6px" }}>
-                หน่วยนับ (base_unit) <span style={{ color: "#ef4444" }}>*</span>
+              <label className="ap-label">
+                หน่วยนับ (base_unit) <span className="ap-required">*</span>
               </label>
               <select
                 value={unit}
                 onChange={(e) => setUnit(e.target.value)}
                 required
-                style={{
-                  width: "100%",
-                  padding: "10px 12px",
-                  borderRadius: "8px",
-                  border: "1px solid #cbd5e1",
-                  fontSize: "14px",
-                  backgroundColor: "#fff",
-                }}
+                className="ap-select"
               >
                 {unitOptions.map((opt) => (
                   <option key={opt} value={opt}>
@@ -697,7 +507,7 @@ function AddProductForm({ parentId, onBack }: AddProductScreenProps) {
             </div>
 
             <div>
-              <label style={{ display: "block", fontSize: "14px", fontWeight: "600", color: "#334155", marginBottom: "6px" }}>
+              <label className="ap-label">
                 จำนวนสต็อกเริ่มต้น
               </label>
               <input
@@ -705,47 +515,34 @@ function AddProductForm({ parentId, onBack }: AddProductScreenProps) {
                 value={stockQuantity}
                 onChange={(e) => setStockQuantity(e.target.value)}
                 placeholder="0"
-                style={{
-                  width: "100%",
-                  padding: "10px 12px",
-                  borderRadius: "8px",
-                  border: "1px solid #cbd5e1",
-                  fontSize: "14px",
-                }}
+                className="ap-input"
               />
             </div>
           </div>
         </div>
 
         {/* SECTION 3: การจัดการแจ้งเตือนสต็อก */}
-        <div
-          style={{
-            backgroundColor: "#ffffff",
-            borderRadius: "16px",
-            padding: "24px",
-            border: "1px solid #f1f5f9",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
-            <h3 style={{ margin: 0, fontSize: "16px", fontWeight: "700", color: "#0f172a", display: "flex", alignItems: "center", gap: "8px" }}>
-              <Bell size={18} style={{ color: "#046c4e" }} />
+        <div className="ap-section-card">
+          <div className="ap-notification-header">
+            <h3 className="ap-section-title" style={{ margin: 0 }}>
+              <Bell size={18} className="ap-bell-icon" />
               3. การจัดการแจ้งเตือนสต็อก
             </h3>
 
-            <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "14px", fontWeight: "600", color: "#334155" }}>
+            <label className="ap-checkbox-label">
               <input
                 type="checkbox"
                 checked={enableNotification}
                 onChange={(e) => setEnableNotification(e.target.checked)}
-                style={{ width: "18px", height: "18px", accentColor: "#046c4e", cursor: "pointer" }}
+                className="ap-checkbox"
               />
               เปิดการแจ้งเตือนสินค้าใกล้หมด
             </label>
           </div>
 
           {enableNotification && (
-            <div style={{ maxWidth: "400px", marginTop: "12px" }}>
-              <label style={{ display: "block", fontSize: "14px", fontWeight: "600", color: "#334155", marginBottom: "6px" }}>
+            <div className="ap-reorder-container">
+              <label className="ap-label">
                 จุดสั่งซื้อเติมสต็อก (reorder_point)
               </label>
               <input
@@ -753,15 +550,9 @@ function AddProductForm({ parentId, onBack }: AddProductScreenProps) {
                 value={lowStockThreshold}
                 onChange={(e) => setLowStockThreshold(e.target.value)}
                 placeholder="5"
-                style={{
-                  width: "100%",
-                  padding: "10px 12px",
-                  borderRadius: "8px",
-                  border: "1px solid #cbd5e1",
-                  fontSize: "14px",
-                }}
+                className="ap-input"
               />
-              <span style={{ fontSize: "12px", color: "#64748b", marginTop: "4px", display: "block" }}>
+              <span className="ap-field-note">
                 ระบบจะแจ้งเตือนเมื่อสินค้าเหลือเท่ากับหรือน้อยกว่าจำนวนนี้
               </span>
             </div>
@@ -769,20 +560,11 @@ function AddProductForm({ parentId, onBack }: AddProductScreenProps) {
         </div>
 
         {/* ปุ่มบันทึก */}
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}>
+        <div className="ap-form-actions">
           <button
             type="button"
             onClick={handleBack}
-            style={{
-              padding: "10px 20px",
-              backgroundColor: "#ffffff",
-              color: "#475569",
-              borderRadius: "10px",
-              border: "1px solid #cbd5e1",
-              fontSize: "14px",
-              fontWeight: "600",
-              cursor: "pointer",
-            }}
+            className="ap-btn-cancel"
           >
             ยกเลิก
           </button>
@@ -790,19 +572,7 @@ function AddProductForm({ parentId, onBack }: AddProductScreenProps) {
           <button
             type="submit"
             disabled={saving}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "8px",
-              padding: "10px 24px",
-              backgroundColor: "#046c4e",
-              color: "#ffffff",
-              borderRadius: "10px",
-              border: "none",
-              fontSize: "14px",
-              fontWeight: "600",
-              cursor: saving ? "not-allowed" : "pointer",
-            }}
+            className="ap-btn-submit"
           >
             <Save size={18} />
             <span>{saving ? "กำลังบันทึก..." : editId ? "บันทึกการแก้ไข" : "บันทึกข้อมูลสินค้า"}</span>

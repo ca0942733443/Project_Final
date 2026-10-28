@@ -2,6 +2,8 @@
 -- Sat Sep 12 12:08:37 2026
 -- Model: New Model    Version: 1.0
 -- MySQL Workbench Forward Engineering
+-- Legacy reference only: this export predates sub_categories and is not the
+-- schema used by the application. Use database/pro.corrected.sql instead.
 
 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0;
 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0;
@@ -87,6 +89,7 @@ CREATE TABLE IF NOT EXISTS `captain_kai_sod_db`.`products` (
   `supplier_id` INT UNSIGNED NULL DEFAULT NULL,
   `sku` VARCHAR(50) NOT NULL,
   `product_name` VARCHAR(200) NOT NULL,
+  `package_size` VARCHAR(100) NULL DEFAULT NULL,
   `base_unit` VARCHAR(30) NOT NULL COMMENT 'หน่วยฐานสำหรับตัดสต็อก เช่น กิโลกรัม',
   `reorder_point` DECIMAL(14,3) NOT NULL DEFAULT 0,
   `image_url` VARCHAR(500) NULL DEFAULT NULL,

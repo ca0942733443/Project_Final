@@ -31,6 +31,18 @@ async function indexExists(connection: mysql.Connection, tableName: string, inde
   return Number(rows[0]?.count ?? 0) > 0;
 }
 
+async function foreignKeysForColumn(connection: mysql.Connection, tableName: string, columnName: string) {
+  const [rows] = await connection.query<Array<RowDataPacket & { constraintName: string }>>(`
+    SELECT DISTINCT CONSTRAINT_NAME AS constraintName
+    FROM information_schema.key_column_usage
+    WHERE table_schema = DATABASE()
+      AND table_name = ?
+      AND column_name = ?
+      AND referenced_table_name IS NOT NULL
+  `, [tableName, columnName]);
+  return rows.map((row) => row.constraintName);
+}
+
 async function initializeDatabase() {
   if (!/^[a-zA-Z0-9_]+$/.test(env.database.name)) {
     throw new Error("DB_NAME ใช้ได้เฉพาะตัวอักษร ตัวเลข และ underscore");
@@ -52,6 +64,22 @@ async function initializeDatabase() {
     await connection.query(`CREATE DATABASE IF NOT EXISTS \`${env.database.name}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
     await connection.query(`USE \`${env.database.name}\``);
     await connection.query(schema);
+
+    // The app stores subcategories in their own table. Remove the unused
+    // self-referencing column only when it contains no hierarchy data.
+    if (await columnExists(connection, "categories", "parent_id")) {
+      const [parentRows] = await connection.query<Array<RowDataPacket & { count: number }>>(
+        "SELECT COUNT(*) AS count FROM categories WHERE parent_id IS NOT NULL",
+      );
+      if (Number(parentRows[0]?.count ?? 0) > 0) {
+        throw new Error("categories.parent_id still contains data; migrate those rows into sub_categories before initializing the database");
+      }
+      for (const constraintName of await foreignKeysForColumn(connection, "categories", "parent_id")) {
+        const safeConstraintName = constraintName.replace(/`/g, "``");
+        await connection.query(`ALTER TABLE categories DROP FOREIGN KEY \`${safeConstraintName}\``);
+      }
+      await connection.query("ALTER TABLE categories DROP COLUMN parent_id");
+    }
     if (!(await columnExists(connection, "categories", "is_active"))) {
       await connection.query("ALTER TABLE categories ADD COLUMN is_active TINYINT NOT NULL DEFAULT TRUE");
     }
@@ -70,8 +98,29 @@ async function initializeDatabase() {
     if (!(await columnExists(connection, "products", "sub_category_id"))) {
       await connection.query("ALTER TABLE products ADD COLUMN sub_category_id INT UNSIGNED NULL AFTER category_id");
     }
+    if (!(await indexExists(connection, "products", "idx_products_sub_category"))) {
+      await connection.query("ALTER TABLE products ADD INDEX idx_products_sub_category (sub_category_id)");
+    }
+    if (!(await constraintExists(connection, "products", "fk_products_sub_category"))) {
+      await connection.query(`
+        UPDATE products p
+        LEFT JOIN sub_categories sc ON sc.sub_category_id = p.sub_category_id
+        SET p.sub_category_id = NULL
+        WHERE p.sub_category_id IS NOT NULL AND sc.sub_category_id IS NULL
+      `);
+      await connection.query(`
+        ALTER TABLE products
+        ADD CONSTRAINT fk_products_sub_category
+        FOREIGN KEY (sub_category_id) REFERENCES sub_categories (sub_category_id)
+        ON DELETE SET NULL ON UPDATE CASCADE
+      `);
+    }
+    await connection.query("DROP TABLE IF EXISTS schema_migration_product_subcategory_orphans");
     if (!(await columnExists(connection, "products", "description"))) {
       await connection.query("ALTER TABLE products ADD COLUMN description TEXT NULL AFTER product_name");
+    }
+    if (!(await columnExists(connection, "products", "package_size"))) {
+      await connection.query("ALTER TABLE products ADD COLUMN package_size VARCHAR(100) NULL AFTER product_name");
     }
     if (!(await columnExists(connection, "products", "cost_price"))) {
       await connection.query("ALTER TABLE products ADD COLUMN cost_price DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER description");

@@ -15,6 +15,7 @@ interface SummaryRow extends RowDataPacket {
 interface SeriesRow extends RowDataPacket {
   label: string;
   total: number;
+  orderCount?: number;
 }
 
 interface CategoryShareRow extends RowDataPacket {
@@ -52,25 +53,31 @@ function completeSalesSeries(period: string, rows: SeriesRow[]) {
     ? Array.from({ length: 24 }, (_, hour) => `${String(hour).padStart(2, "0")}:00`)
     : period === "week"
       ? weekdayLabels
-      : Array.from({ length: 5 }, (_, index) => `อาทิตย์ที่ ${index + 1}`);
+      : period === "year"
+        ? ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."]
+        : Array.from({ length: 5 }, (_, index) => `อาทิตย์ที่ ${index + 1}`);
 
   return labels.map((label) => ({ label, total: totals.get(label) ?? 0 }));
 }
 
 dashboardRouter.get("/", asyncHandler(async (request, response) => {
   const period = typeof request.query.period === "string" ? request.query.period : "week";
-  if (!["day", "week", "month"].includes(period)) throw new ApiError(400, "ช่วงเวลารายงานไม่ถูกต้อง");
+  if (!["day", "week", "month", "year"].includes(period)) throw new ApiError(400, "ช่วงเวลารายงานไม่ถูกต้อง");
 
   const startExpression = period === "day"
     ? "CURDATE()"
     : period === "week"
       ? "DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)"
-      : "DATE_FORMAT(CURDATE(), '%Y-%m-01')";
+      : period === "year"
+        ? "DATE_FORMAT(CURDATE(), '%Y-01-01')"
+        : "DATE_FORMAT(CURDATE(), '%Y-%m-01')";
   const seriesLabel = period === "day"
     ? "DATE_FORMAT(s.sold_at, '%H:00')"
     : period === "week"
       ? "ELT(WEEKDAY(s.sold_at) + 1, 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัส', 'ศุกร์', 'เสาร์', 'อาทิตย์')"
-      : "CONCAT('อาทิตย์ที่ ', CEIL(DAYOFMONTH(s.sold_at) / 7))";
+      : period === "year"
+        ? "ELT(MONTH(s.sold_at), 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.')"
+        : "CONCAT('อาทิตย์ที่ ', CEIL(DAYOFMONTH(s.sold_at) / 7))";
   const salesPeriodCondition = `s.sale_status <> 'CANCELLED' AND s.sold_at >= ${startExpression}`;
 
   const [summaryResult, seriesResult, hourlyResult, categoryResult, paymentResult, sellersResult, inventoryResult] = await Promise.all([
@@ -100,7 +107,7 @@ dashboardRouter.get("/", asyncHandler(async (request, response) => {
       ORDER BY MIN(s.sold_at) ASC
     `),
     pool.query<SeriesRow[]>(`
-      SELECT DATE_FORMAT(s.sold_at, '%H:00') AS label, SUM(s.total_amount) AS total
+      SELECT DATE_FORMAT(s.sold_at, '%H:00') AS label, COUNT(*) AS orderCount
       FROM sales s
       WHERE ${salesPeriodCondition}
       GROUP BY HOUR(s.sold_at), label
@@ -150,7 +157,6 @@ dashboardRouter.get("/", asyncHandler(async (request, response) => {
       WHERE ${salesPeriodCondition}
       GROUP BY p.product_id, p.product_name, c.category_name, p.base_unit
       ORDER BY revenue DESC
-      LIMIT 5
     `),
     pool.query<InventoryAnalysisRow[]>(`
       SELECT
@@ -188,7 +194,11 @@ dashboardRouter.get("/", asyncHandler(async (request, response) => {
       period,
       summary: { ...summary, netIncome: summary.totalRevenue - summary.totalExpense },
       salesSeries: completeSalesSeries(period, seriesResult[0]),
-      hourlySeries: hourlyResult[0],
+      hourlySeries: Array.from({ length: 24 }, (_, hour) => {
+        const label = `${String(hour).padStart(2, "0")}:00`;
+        const row = hourlyResult[0].find((item) => item.label === label);
+        return { label, total: 0, orderCount: Number(row?.orderCount) || 0 };
+      }),
       categoryShares: categoryResult[0],
       paymentBreakdown: paymentResult[0],
       bestSellers: sellersResult[0],
