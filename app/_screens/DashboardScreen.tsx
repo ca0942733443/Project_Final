@@ -152,10 +152,10 @@ export default function DashboardScreen() {
       <Panel title="ความหนาแน่นรายชั่วโมง" action={<DensityLegend />} className="hour-panel">{data?.hourlySeries?.length ? <CompactBarChart rows={data.hourlySeries} /> : <div className="api-message">ยังไม่มีข้อมูลรายชั่วโมง</div>}</Panel>
       <Panel title="วิธีการชำระเงิน" className="payment-panel">{data?.paymentBreakdown.map((row) => <div className="payment" key={row.method}><span>{paymentLabels[row.method]} <b>{formatMoney(row.total)}</b></span><div><i style={{ width: `${paymentTotal ? row.total / paymentTotal * 100 : 0}%` }} /></div></div>)}{!data?.paymentBreakdown.length && <div className="api-message">ยังไม่มีข้อมูลการชำระเงิน</div>}</Panel>
     </div>
-    <Panel title="สินค้าขายดี" action={<ViewAll href="/products" />} className="table-panel dashboard-table">
+    <Panel title="สินค้าขายดี" action={<ViewAll href="/productmanage" />} className="table-panel dashboard-table">
       <div className="table-wrap"><table><thead><tr>{["ลำดับ", "ชื่อสินค้า", "หมวดหมู่", "น้ำหนักที่ขายแล้ว", "รายได้", "% ยอดขาย"].map((label) => <th key={label}>{label}</th>)}</tr></thead><tbody>{data?.bestSellers.slice(0, 3).map((row, index) => <tr key={row.productId}><td>{index + 1}</td><td>{row.productName}</td><td><span className={`tag tag-${index % 3}`}>{row.categoryName}</span></td><td>{row.quantitySold.toLocaleString("th-TH", { maximumFractionDigits: 1 })} {row.unit ?? ""}</td><td>{formatMoney(row.revenue)}</td><td>{totalRevenue ? Math.round(row.revenue / totalRevenue * 100) : 0} %</td></tr>)}</tbody></table></div>
     </Panel>
-    <Panel title="วิเคราะห์สินค้าคงคลัง" action={<ViewAll href="/inventory" />} className="table-panel dashboard-table inventory-analysis-table">
+    <Panel title="วิเคราะห์สินค้าคงคลัง" action={<ViewAll href="/stock" />} className="table-panel dashboard-table inventory-analysis-table">
       <div className="table-wrap"><table><thead><tr>{["ชื่อสินค้า", "ยอดขาย", "สถานะ", "แนะนำการดำเนินการ"].map((label) => <th key={label}>{label}</th>)}</tr></thead><tbody>{data?.inventoryAnalysis.slice(0, 3).map((row) => <tr key={row.productId}><td>{row.productName}</td><td>{formatMoney(row.salesRevenue)}</td><td className={row.status === "fast" ? "success-text" : row.status === "slow" ? "danger-text" : ""}>{row.status === "fast" ? "ขายดีมาก" : row.status === "slow" ? "ขายช้า" : "ขายดี"}</td><td className={row.status === "slow" ? "danger-text" : ""}>{row.action ?? "-"}</td></tr>)}</tbody></table></div>
     </Panel>
   </AdminShell>;
