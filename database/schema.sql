@@ -1,5 +1,10 @@
 SET NAMES utf8mb4;
 
+-- LEGACY / NOT USED BY THE APPLICATION.
+-- This file describes an older, incompatible schema (id/name/products/orders).
+-- The application initializer uses database/pro.corrected.sql. Do not import
+-- this file into the application database.
+
 CREATE TABLE IF NOT EXISTS categories (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   name VARCHAR(100) NOT NULL,

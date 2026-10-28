@@ -887,7 +887,7 @@ const handleToggleMenu = (
                               {subExpanded &&
                                 sub.subCategories?.map((subSub) => (
                                   <tr
-                                    key={`product-${subSub.id}`}
+                                    key={`${subSub.isProduct ? "product" : "subcategory"}-${subSub.id}`}
                                     style={{ backgroundColor: "#ffffff" }}
                                   >
                                     <td
@@ -961,8 +961,10 @@ const handleToggleMenu = (
                                       >
                                         <button
                                           type="button"
-                                          onClick={() => router.push(`/addproduct?id=${subSub.id}`)}
-                                          title="แก้ไขสินค้า"
+                                          onClick={() => subSub.isProduct
+                                            ? router.push(`/addproduct?id=${subSub.id}`)
+                                            : handleOpenEditLevel3(cat.id, sub.id, subSub)}
+                                          title={subSub.isProduct ? "แก้ไขสินค้า" : "แก้ไขหมวดหมู่ย่อย"}
                                           style={{
                                             background: "none",
                                             border: "none",
@@ -973,7 +975,22 @@ const handleToggleMenu = (
                                         >
                                           <Edit size={15} />
                                         </button>
-
+                                        {!subSub.isProduct && (
+                                          <button
+                                            type="button"
+                                            onClick={() => handleRequestDeleteLevel3(cat.id, sub.id, subSub.id, subSub.name)}
+                                            title="ลบหมวดหมู่ย่อย"
+                                            style={{
+                                              background: "none",
+                                              border: "none",
+                                              cursor: "pointer",
+                                              padding: "4px",
+                                              color: "#ef4444",
+                                            }}
+                                          >
+                                            <Trash2 size={15} />
+                                          </button>
+                                        )}
                                       </div>
                                     </td>
                                   </tr>

@@ -209,7 +209,7 @@ export default function RecommendationsScreen() {
         <button className="recommendation-clear-button" onClick={() => setHeldOrderQuantities({})} type="button">ล้างรายการพัก</button>
         <Link className="recommendation-confirm-button" href="/inventory-order-create">ตรวจสอบและสร้างใบสั่งซื้อ</Link>
       </div>}
-      {tab === "sales" ? <div className="table-wrap"><table><thead><tr>{["สินค้า", "หมวดหมู่", "Supplier", "ขายได้ใน 7 วัน", "สต็อกคงเหลือ", "เป้าสต็อก", "ปริมาณที่แนะนำ", "จัดการ"].map((title) => <th key={title}>{title}</th>)}</tr></thead><tbody>
+      {tab === "sales" ? <div className="table-wrap"><table><thead><tr>{["สินค้า", "หมวดหมู่", "Supplier", "ขายได้ใน 7 วัน", "สต็อกคงเหลือ", "เป้าสต็อก", "ปริมาณที่แนะนำ", "สั่งซื้อ"].map((title) => <th key={title}>{title}</th>)}</tr></thead><tbody>
         {sales.map((item) => {
           const stockRatio = item.targetStock > 0 ? Math.min(100, item.currentStock / item.targetStock * 100) : 100;
           const isHeld = Number(heldOrderQuantities[item.productId] ?? 0) > 0;
@@ -221,11 +221,11 @@ export default function RecommendationsScreen() {
             <td><div className="stock-level"><span>{numberText(item.currentStock)} {item.unit}</span><b>{Math.round(stockRatio)}%</b><i><em style={{ width: `${stockRatio}%` }} /></i></div></td>
             <td>{numberText(item.targetStock)} {item.unit}</td>
             <td className="suggested-qty">{item.suggestedQuantity > 0 ? `+ ${numberText(item.suggestedQuantity)} ${item.unit}` : "ไม่ต้องเติม"}</td>
-            <td><TableActionMenu label={`จัดการสินค้า ${item.productName}`}><button className="table-action-menu-item" disabled={item.suggestedQuantity <= 0} onClick={() => toggleHeldOrderItem(item)} role="menuitem" type="button">{isHeld ? <><Check size={15} /> นำออกจากรายการพัก</> : <><PackagePlus size={15} /> พักรายการสั่งซื้อ</>}</button></TableActionMenu></td>
+            <td><TableActionMenu label={`สั่งซื้อสินค้า ${item.productName}`}><button className="table-action-menu-item" disabled={item.suggestedQuantity <= 0} onClick={() => toggleHeldOrderItem(item)} role="menuitem" type="button">{isHeld ? <><Check size={15} /> นำออกจากรายการพัก</> : <><PackagePlus size={15} /> พักรายการสั่งซื้อ</>}</button></TableActionMenu></td>
           </tr>;
         })}
         {!loading && sales.length === 0 && <tr><td className="empty-cell" colSpan={8}>ยังไม่มียอดขายในช่วง 7 วันล่าสุด หรือไม่มีสินค้าที่ถึงจุดสั่งซื้อ</td></tr>}
-      </tbody></table></div> : <div className="table-wrap"><table><thead><tr>{["ลูกค้า", "ซื้อครั้งล่าสุด", "หายไป", "สินค้าที่ลูกค้าเคยซื้อ", "เบอร์", "ทะเบียนรถ", "จัดการ"].map((title) => <th key={title}>{title}</th>)}</tr></thead><tbody>
+      </tbody></table></div> : <div className="table-wrap"><table><thead><tr>{["ลูกค้า", "ซื้อครั้งล่าสุด", "หายไป", "สินค้าที่ลูกค้าเคยซื้อ", "เบอร์", "ทะเบียนรถ", "เตรียมสินค้า"].map((title) => <th key={title}>{title}</th>)}</tr></thead><tbody>
         {customers.map((customer) => {
           const isPrepared = preparedCustomerIds.includes(customer.customerId);
           return <tr key={customer.customerId}>
@@ -235,7 +235,7 @@ export default function RecommendationsScreen() {
             <td><div className="customer-recommendation-products">{customer.products.length ? customer.products.map((product) => <span key={product.productId}>{product.productName}<small>{numberText(product.quantityPurchased)} {product.unit}</small></span>) : <span>ยังไม่มีรายละเอียดสินค้า</span>}</div></td>
             <td>{customer.phone ?? "–"}</td>
             <td>{customer.carPlate ?? "–"}</td>
-            <td><TableActionMenu label={`จัดการรายการแนะนำของ ${customer.fullName}`}><button className="table-action-menu-item" onClick={() => setPreparedCustomerIds((current) => isPrepared ? current.filter((id) => id !== customer.customerId) : [...current, customer.customerId])} role="menuitem" type="button">{isPrepared ? <><Check size={15} /> ยกเลิกเตรียมสินค้า</> : <><PackagePlus size={15} /> เตรียมสินค้า</>}</button></TableActionMenu></td>
+            <td><TableActionMenu label={`เตรียมสินค้าสำหรับ ${customer.fullName}`}><button className="table-action-menu-item" onClick={() => setPreparedCustomerIds((current) => isPrepared ? current.filter((id) => id !== customer.customerId) : [...current, customer.customerId])} role="menuitem" type="button">{isPrepared ? <><Check size={15} /> ยกเลิกเตรียมสินค้า</> : <><PackagePlus size={15} /> เตรียมสินค้า</>}</button></TableActionMenu></td>
           </tr>;
         })}
         {!loading && customers.length === 0 && <tr><td className="empty-cell" colSpan={7}>ยังไม่มีลูกค้าที่ไม่ซื้อซ้ำตามจำนวนวันที่เลือก</td></tr>}

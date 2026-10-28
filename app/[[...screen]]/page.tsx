@@ -14,11 +14,12 @@ import PosScreen from "../_screens/PosScreen";
 import PurchaseOrderScreen from "../_screens/PurchaseOrderScreen";
 import RecommendationsScreen from "../_screens/RecommendationsScreen";
 import SettingsScreen from "../_screens/SettingsScreen";
-import SuppliersScreen from "../_screens/SuppliersScreen"; // 🟢 Import หน้า SuppliersScreen
-import StockScreen from "../_screens/StockScreen"; // 🟢 Import หน้า StockScreen
+import SuppliersScreen from "../_screens/SuppliersScreen";
+import StockScreen from "../_screens/StockScreen";
 import CategoryScreen from "../_screens/CategoryScreen";
 import ProductManageScreen from "../_screens/ProductManageScreen";
 import AddProductScreen from "../_screens/AddProductScreen";
+import BestSellingScreen from "../_screens/BestSellingScreen";
 
 const routeScreens: Record<string, ComponentType> = {
   customers: CustomersScreen,
@@ -33,11 +34,12 @@ const routeScreens: Record<string, ComponentType> = {
   "purchase-order": PurchaseOrderScreen,
   recommendations: RecommendationsScreen,
   settings: SettingsScreen,
-  suppliers: SuppliersScreen, // 🟢 เพิ่มแมปปิ้งสำหรับ URL /suppliers
-  stock: StockScreen, // 🟢 เพิ่มแมปปิ้งสำหรับ URL /suppliers
+  suppliers: SuppliersScreen,
+  stock: StockScreen,
   categories: CategoryScreen,
   productmanage: ProductManageScreen,
-  addproduct: AddProductScreen
+  addproduct: AddProductScreen,
+  "best-sellers": BestSellingScreen,
 };
 
 type ScreenRouteProps = {

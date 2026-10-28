@@ -1,0 +1,2 @@
+-- No database backup is stored in this file. The canonical application schema
+-- is database/pro.corrected.sql; keep actual data backups outside this file.
