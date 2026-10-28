@@ -55,7 +55,6 @@ export default function CustomersScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
-  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
@@ -81,18 +80,11 @@ export default function CustomersScreen() {
   useEffect(() => { void loadCustomers(); }, []);
 
   const openCreateForm = () => {
-    setEditingCustomer(null);
-    setShowForm(true);
-  };
-
-  const openEditForm = (customer: Customer) => {
-    setEditingCustomer(customer);
     setShowForm(true);
   };
 
   const closeForm = () => {
     setShowForm(false);
-    setEditingCustomer(null);
   };
 
   const saveCustomer = async (event: FormEvent<HTMLFormElement>) => {
@@ -110,8 +102,8 @@ export default function CustomersScreen() {
     };
 
     try {
-      await apiFetch(editingCustomer ? `/customers/${editingCustomer.id}` : "/customers", {
-        method: editingCustomer ? "PATCH" : "POST",
+      await apiFetch("/customers", {
+        method: "POST",
         body: JSON.stringify(payload),
       });
       closeForm();
@@ -188,12 +180,12 @@ export default function CustomersScreen() {
           <td className={Number(customer.overdueBalance) > 0 ? "danger-text" : ""}>฿{money(customer.overdueBalance)}</td>
           <td><span className="soft-tag">{memberLevel(Number(customer.totalSpent))}</span></td>
           <td>฿{money(customer.totalSpent)}</td>
-          <td><TableActionMenu label={`จัดการลูกค้า ${customer.fullName}`}><Link className="table-action-menu-item" href={`/customer-credit?id=${customer.id}`} role="menuitem"><Eye size={15} /> ดูข้อมูลและบิลขายเชื่อ</Link><button className="table-action-menu-item" onClick={() => openEditForm(customer)} role="menuitem" type="button"><Pencil size={15} /> แก้ไขข้อมูล</button><button className="table-action-menu-item danger" disabled={deletingId === customer.id} onClick={() => void removeCustomer(customer)} role="menuitem" type="button"><Trash2 size={15} /> ลบลูกค้า</button></TableActionMenu></td>
+          <td><TableActionMenu label={`จัดการลูกค้า ${customer.fullName}`}><Link className="table-action-menu-item" href={`/customer-credit?id=${customer.id}`} role="menuitem"><Eye size={15} /> ดูข้อมูลและบิลขายเชื่อ</Link><Link className="table-action-menu-item" href={`/customers/${customer.id}/edit`} role="menuitem"><Pencil size={15} /> แก้ไขข้อมูล</Link><button className="table-action-menu-item danger" disabled={deletingId === customer.id} onClick={() => void removeCustomer(customer)} role="menuitem" type="button"><Trash2 size={15} /> ลบลูกค้า</button></TableActionMenu></td>
         </tr>)}
         {!loading && customers.length === 0 && <tr><td className="empty-cell" colSpan={9}>ยังไม่มีลูกค้าในระบบ</td></tr>}
       </tbody></table></div>
       <div className="recommendation-pagination"><span>แสดงลูกค้าที่ใช้งานอยู่ทั้งหมด {customers.length} รายการ</span></div>
     </section>
-    {showForm && <div className="modal-backdrop"><form key={editingCustomer?.id ?? "new"} className="modal customer-form-modal" onSubmit={saveCustomer}><button type="button" className="modal-close" onClick={closeForm}><X /></button><h2>{editingCustomer ? "แก้ไขข้อมูลลูกค้า" : "เพิ่มลูกค้าใหม่"}</h2><p className="modal-description">ข้อมูลทั่วไปและวงเงินขายเชื่อของลูกค้า ส่วนรายการบิลและการรับชำระจัดการได้ที่หน้าบัญชีขายเชื่อ</p><div className="product-form-grid"><label className="wide">ชื่อ-นามสกุล<input defaultValue={editingCustomer?.fullName ?? ""} name="fullName" required /></label><label>เบอร์โทรศัพท์<input defaultValue={editingCustomer?.phone ?? ""} name="phone" type="tel" /></label><label>ทะเบียนรถ<input defaultValue={editingCustomer?.carPlate ?? ""} name="carPlate" /></label><label>สถานที่<input defaultValue={editingCustomer?.location ?? ""} name="location" required /></label><label>ประเภทรถ<select defaultValue={editingCustomer?.carTypeId ? String(editingCustomer.carTypeId) : ""} name="carTypeId"><option value="">ไม่ระบุ</option>{options.carTypes.map((option) => <option key={option.id} value={option.id}>{option.name ?? `#${option.id}`}</option>)}</select></label><label>วงเงินขายเชื่อ<input defaultValue={editingCustomer?.creditLimit ?? 0} min="0" name="creditLimit" step="0.01" type="number" /></label></div><div className="product-form-actions"><button onClick={closeForm} type="button">ยกเลิก</button><button className="primary-button" disabled={saving} type="submit">{saving ? "กำลังบันทึก..." : editingCustomer ? "บันทึกการแก้ไข" : "บันทึกลูกค้า"}</button></div></form></div>}
+    {showForm && <div className="modal-backdrop"><form className="modal customer-form-modal" onSubmit={saveCustomer}><button type="button" className="modal-close" onClick={closeForm}><X /></button><h2>เพิ่มลูกค้าใหม่</h2><p className="modal-description">ข้อมูลทั่วไปและวงเงินขายเชื่อของลูกค้า ส่วนรายการบิลและการรับชำระจัดการได้ที่หน้าบัญชีขายเชื่อ</p><div className="product-form-grid"><label className="wide">ชื่อ-นามสกุล<input name="fullName" required /></label><label>เบอร์โทรศัพท์<input name="phone" type="tel" /></label><label>ทะเบียนรถ<input name="carPlate" /></label><label>สถานที่<input name="location" required /></label><label>ประเภทรถ<select name="carTypeId"><option value="">ไม่ระบุ</option>{options.carTypes.map((option) => <option key={option.id} value={option.id}>{option.name ?? `#${option.id}`}</option>)}</select></label><label>วงเงินขายเชื่อ<input defaultValue={0} min="0" name="creditLimit" step="0.01" type="number" /></label></div><div className="product-form-actions"><button onClick={closeForm} type="button">ยกเลิก</button><button className="primary-button" disabled={saving} type="submit">{saving ? "กำลังบันทึก..." : "บันทึกลูกค้า"}</button></div></form></div>}
   </AdminShell>;
 }
