@@ -12,7 +12,7 @@ import {
   RotateCcw,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import AdminShell from "../_components/AdminShell";
 import { PageTitle } from "../_components/PageElements";
 import PaymentModal from "../_components/PaymentModal";
@@ -215,15 +215,36 @@ export default function PosScreen() {
     barcodeInputRef.current?.focus();
   };
 
-  useEffect(() => {
-    Promise.all([apiFetch<Product[]>("/products"), apiFetch<Category[]>("/categories")])
-      .then(([productRows, categoryRows]) => {
-        setProducts(productRows);
-        setCategories(categoryRows);
-      })
-      .catch((loadError) => setError(errorMessage(loadError)))
-      .finally(() => setLoading(false));
+  const loadCatalog = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoading(true);
+    setError("");
+    try {
+      const [productRows, categoryRows] = await Promise.all([
+        apiFetch<Product[]>("/products"),
+        apiFetch<Category[]>("/categories"),
+      ]);
+      setProducts(productRows);
+      setCategories(categoryRows);
+    } catch (loadError) {
+      setError(errorMessage(loadError));
+    } finally {
+      if (showLoading) setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadCatalog();
+
+    const refreshCatalog = () => {
+      if (document.visibilityState === "visible") void loadCatalog(false);
+    };
+    window.addEventListener("focus", refreshCatalog);
+    document.addEventListener("visibilitychange", refreshCatalog);
+    return () => {
+      window.removeEventListener("focus", refreshCatalog);
+      document.removeEventListener("visibilitychange", refreshCatalog);
+    };
+  }, [loadCatalog]);
 
   const createOrder = async (
     method: "cash" | "qr" | "credit",

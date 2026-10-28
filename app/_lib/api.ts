@@ -21,6 +21,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 
   const response = await fetch(`${API_URL}${path}`, {
     ...init,
+    cache: init?.cache ?? "no-store",
     headers,
   });
 
