@@ -2,6 +2,8 @@
 -- Sat Sep 12 12:08:37 2026
 -- Model: New Model    Version: 1.0
 -- MySQL Workbench Forward Engineering
+-- Canonical application schema. Category hierarchy is categories -> sub_categories
+-- -> sub_sub_categories; do not add a categories.parent_id hierarchy alongside it.
 
 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0;
 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0;
@@ -78,6 +80,19 @@ CREATE TABLE IF NOT EXISTS `captain_kai_sod_db`.`sub_categories` (
     ON UPDATE CASCADE)
 ENGINE = InnoDB;
 
+CREATE TABLE IF NOT EXISTS `captain_kai_sod_db`.`sub_sub_categories` (
+  `sub_sub_category_id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `sub_category_id` INT UNSIGNED NOT NULL,
+  `sub_sub_category_name` VARCHAR(100) NOT NULL,
+  PRIMARY KEY (`sub_sub_category_id`),
+  INDEX `idx_sub_sub_categories_sub_category` (`sub_category_id` ASC),
+  CONSTRAINT `fk_sub_sub_category`
+    FOREIGN KEY (`sub_category_id`)
+    REFERENCES `captain_kai_sod_db`.`sub_categories` (`sub_category_id`)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE)
+ENGINE = InnoDB;
+
 
 -- -----------------------------------------------------
 -- Table `captain_kai_sod_db`.`suppliers`
@@ -103,6 +118,7 @@ CREATE TABLE IF NOT EXISTS `captain_kai_sod_db`.`products` (
   `supplier_id` INT UNSIGNED NULL DEFAULT NULL,
   `sku` VARCHAR(50) NOT NULL,
   `product_name` VARCHAR(200) NOT NULL,
+  `package_size` VARCHAR(100) NULL DEFAULT NULL,
   `description` TEXT NULL DEFAULT NULL,
   `cost_price` DECIMAL(12,2) NOT NULL DEFAULT 0,
   `base_unit` VARCHAR(30) NOT NULL COMMENT 'หน่วยฐานสำหรับตัดสต็อก เช่น กิโลกรัม',
@@ -113,11 +129,17 @@ CREATE TABLE IF NOT EXISTS `captain_kai_sod_db`.`products` (
   PRIMARY KEY (`product_id`),
   UNIQUE INDEX `sku` (`sku` ASC) VISIBLE,
   INDEX `fk_products_category` (`category_id` ASC) VISIBLE,
+  INDEX `idx_products_sub_category` (`sub_category_id` ASC),
   INDEX `fk_products_supplier` (`supplier_id` ASC) VISIBLE,
   CONSTRAINT `fk_products_category`
     FOREIGN KEY (`category_id`)
     REFERENCES `captain_kai_sod_db`.`categories` (`category_id`)
     ON DELETE RESTRICT
+    ON UPDATE CASCADE,
+  CONSTRAINT `fk_products_sub_category`
+    FOREIGN KEY (`sub_category_id`)
+    REFERENCES `captain_kai_sod_db`.`sub_categories` (`sub_category_id`)
+    ON DELETE SET NULL
     ON UPDATE CASCADE,
   CONSTRAINT `fk_products_supplier`
     FOREIGN KEY (`supplier_id`)

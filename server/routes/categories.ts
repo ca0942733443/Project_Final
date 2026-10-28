@@ -70,7 +70,7 @@ categoriesRouter.get(
     `);
 
     // =========================================================
-    // LEVEL 3 : สินค้าที่เพิ่มจากหน้าจัดการสินค้า
+    // LEVEL 3 : หมวดย่อยระดับ 3 และสินค้าที่ผูกกับหมวดย่อย
     // =========================================================
     const [products] = await pool.query<Level3CategoryRow[]>(`
       SELECT
@@ -83,14 +83,25 @@ categoriesRouter.get(
       ORDER BY p.product_name ASC, p.product_id ASC
     `);
 
+    const [subSubCategories] = await pool.query<Level3CategoryRow[]>(`
+      SELECT
+        sub_sub_category_id AS id,
+        sub_category_id AS subCategoryId,
+        sub_sub_category_name AS name,
+        FALSE AS isProduct
+      FROM sub_sub_categories
+      ORDER BY sub_sub_category_name ASC, sub_sub_category_id ASC
+    `);
+
     // =========================================================
     // เอา Level 3 ไปอยู่ใต้ Level 2
     // =========================================================
     const level2 = subCategories.map((sub) => ({
       ...sub,
-      subCategories: products.filter(
-        (product) => product.subCategoryId === sub.id
-      ),
+      subCategories: [
+        ...subSubCategories.filter((item) => item.subCategoryId === sub.id),
+        ...products.filter((product) => product.subCategoryId === sub.id),
+      ],
     }));
 
     // =========================================================

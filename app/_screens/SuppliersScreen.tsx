@@ -49,7 +49,6 @@ function SupplierListScreen() {
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const [mounted, setMounted] = useState(false);
 
-  // State สำหรับควบคุม Custom Delete Modal
   const [deleteModalState, setDeleteModalState] = useState<{
     isOpen: boolean;
     id: number | null;
@@ -188,19 +187,13 @@ function SupplierListScreen() {
   return (
     <AdminShell active="suppliers">
       <PageTitle
-        title="จัดการผู้จำหน่าย (Suppliers)"
+        title="จัดการผู้จำหน่าย"
         subtitle="บันทึกและตรวจสอบข้อมูลบริษัทคู่ค้าและผู้จำหน่ายวัตถุดิบ"
         action={
           <button
             type="button"
-            className="primary-button"
+            className="primary-button sup-primary-btn"
             onClick={() => router.push("?action=new")}
-            style={{
-              backgroundColor: "#046c4e",
-              color: "#ffffff",
-              borderColor: "#046c4e",
-              cursor: "pointer",
-            }}
           >
             <Plus size={17} /> เพิ่มผู้จำหน่าย
           </button>
@@ -211,42 +204,23 @@ function SupplierListScreen() {
         <Stat label="ผู้จำหน่ายทั้งหมด" value={`${suppliers.length} ราย`} tone="neutral" />
       </div>
 
-      <section className="data-card inventory-stock-card" style={{ marginTop: "20px" }}>
+      <section className="data-card inventory-stock-card sup-card-section">
         <div className="inventory-toolbar">
-          <label className="inventory-search" style={{ width: "100%", maxWidth: "360px", position: "relative", display: "flex", alignItems: "center" }}>
-            <Search size={16} style={{ position: "absolute", left: "12px", color: "#94a3b8", pointerEvents: "none" }} />
+          <label className="inventory-search sup-search-label">
+            <Search size={16} className="sup-search-icon" />
             <input
               type="search"
               placeholder="ค้นหาชื่อผู้จำหน่าย, เบอร์โทร, LINE..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              style={{ width: "100%", paddingLeft: "36px" }}
+              className="sup-search-input"
+              style={{ paddingLeft: "38px" }}
             />
           </label>
         </div>
 
         {loading && <div className="api-message">กำลังโหลดข้อมูลผู้จำหน่าย...</div>}
         {error && <div className="api-message error">{error}</div>}
-
-        <style jsx>{`
-          .action-menu-btn {
-            background: transparent;
-            border: none;
-            cursor: pointer;
-            padding: 6px;
-            border-radius: 8px;
-            color: #64748b;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            transition: background-color 0.15s ease, color 0.15s ease;
-          }
-          .action-menu-btn:hover,
-          .action-menu-btn.active {
-            background-color: #f1f5f9;
-            color: #0f172a;
-          }
-        `}</style>
 
         <div className="inventory-table inventory-table-single">
           <div className="table-wrap">
@@ -258,7 +232,7 @@ function SupplierListScreen() {
                   <th>LINE ID</th>
                   <th>สินค้าที่จำหน่าย</th>
                   <th>ที่อยู่</th>
-                  <th style={{ width: "50px", textAlign: "center" }}></th>
+                  <th className="sup-th-action"></th>
                 </tr>
               </thead>
               <tbody>
@@ -275,20 +249,8 @@ function SupplierListScreen() {
                   return (
                     <tr key={idVal}>
                       <td>
-                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                          <div
-                            style={{
-                              width: "36px",
-                              height: "36px",
-                              borderRadius: "8px",
-                              backgroundColor: "#f1f5f9",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              color: "#046c4e",
-                              flexShrink: 0,
-                            }}
-                          >
+                        <div className="sup-table-cell-flex">
+                          <div className="sup-icon-box">
                             <Building2 size={18} />
                           </div>
                           <strong>{nameVal}</strong>
@@ -299,7 +261,7 @@ function SupplierListScreen() {
                       <td>{productVal}</td>
                       <td>{addressVal}</td>
 
-                      <td style={{ textAlign: "center" }}>
+                      <td className="sup-td-action">
                         <button
                           type="button"
                           className={`action-menu-btn ${isMenuOpen ? "active" : ""}`}
@@ -325,46 +287,15 @@ function SupplierListScreen() {
       {mounted && activeMenuId !== null && menuPosition && activeSupplier && createPortal(
         <div
           ref={menuRef}
+          className="sup-popover-menu"
           style={{
-            position: "fixed",
             top: `${menuPosition.top}px`,
             left: `${menuPosition.left}px`,
-            backgroundColor: "#ffffff",
-            borderRadius: "12px",
-            boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)",
-            border: "1px solid #e2e8f0",
-            zIndex: 9999,
-            minWidth: "140px",
-            padding: "6px",
-            display: "flex",
-            flexDirection: "column",
-            gap: "2px",
           }}
         >
-          <style jsx>{`
-            .menu-item-btn {
-              display: flex;
-              align-items: center;
-              gap: 10px;
-              width: 100%;
-              padding: 8px 12px;
-              border: none;
-              background: transparent;
-              font-size: 14px;
-              font-weight: 500;
-              cursor: pointer;
-              border-radius: 6px;
-              transition: background-color 0.15s ease;
-            }
-            .menu-item-btn:hover {
-              background-color: #f1f5f9;
-            }
-          `}</style>
-
           <button
             type="button"
-            className="menu-item-btn"
-            style={{ color: "#334155" }}
+            className="menu-item-btn edit"
             onClick={() => {
               const idVal = activeSupplier.supplier_id ?? activeSupplier.id;
               setActiveMenuId(null);
@@ -377,8 +308,7 @@ function SupplierListScreen() {
 
           <button
             type="button"
-            className="menu-item-btn"
-            style={{ color: "#ef4444", borderTop: "1px solid #f1f5f9" }}
+            className="menu-item-btn delete"
             onClick={() => {
               const idVal = activeSupplier.supplier_id ?? activeSupplier.id ?? 0;
               const nameVal = activeSupplier.supplier_name || activeSupplier.name || "ไม่ระบุชื่อ";
@@ -393,69 +323,23 @@ function SupplierListScreen() {
 
       {/* Custom Delete Confirmation Modal */}
       {mounted && deleteModalState.isOpen && createPortal(
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            backgroundColor: "rgba(15, 23, 42, 0.5)",
-            backdropFilter: "blur(4px)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 99999,
-            padding: "16px",
-          }}
-        >
-          <div
-            style={{
-              backgroundColor: "#ffffff",
-              borderRadius: "16px",
-              padding: "24px",
-              maxWidth: "400px",
-              width: "100%",
-              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)",
-              textAlign: "center",
-            }}
-          >
-            <div
-              style={{
-                width: "48px",
-                height: "48px",
-                borderRadius: "50%",
-                backgroundColor: "#fef2f2",
-                color: "#ef4444",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                margin: "0 auto 16px auto",
-              }}
-            >
+        <div className="sup-modal-overlay">
+          <div className="sup-modal-box">
+            <div className="sup-modal-icon-wrap">
               <AlertTriangle size={24} />
             </div>
 
-            <h3 style={{ fontSize: "18px", fontWeight: "600", color: "#0f172a", margin: "0 0 8px 0" }}>
-              ยืนยันการลบข้อมูล
-            </h3>
-            <p style={{ fontSize: "14px", color: "#64748b", margin: "0 0 20px 0", lineHeight: "1.5" }}>
+            <h3 className="sup-modal-title">ยืนยันการลบข้อมูล</h3>
+            <p className="sup-modal-desc">
               คุณต้องการลบผู้จัดจำหน่าย <strong>"{deleteModalState.name}"</strong> ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้
             </p>
 
-            <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
+            <div className="sup-modal-actions">
               <button
                 type="button"
                 disabled={deleteModalState.isDeleting}
                 onClick={() => setDeleteModalState({ isOpen: false, id: null, name: "", isDeleting: false })}
-                style={{
-                  flex: 1,
-                  padding: "10px 16px",
-                  borderRadius: "8px",
-                  border: "1px solid #cbd5e1",
-                  backgroundColor: "#ffffff",
-                  color: "#475569",
-                  fontWeight: "500",
-                  cursor: "pointer",
-                  fontSize: "14px",
-                }}
+                className="sup-btn-cancel"
               >
                 ยกเลิก
               </button>
@@ -463,18 +347,7 @@ function SupplierListScreen() {
                 type="button"
                 disabled={deleteModalState.isDeleting}
                 onClick={() => void confirmDelete()}
-                style={{
-                  flex: 1,
-                  padding: "10px 16px",
-                  borderRadius: "8px",
-                  border: "none",
-                  backgroundColor: "#ef4444",
-                  color: "#ffffff",
-                  fontWeight: "500",
-                  cursor: deleteModalState.isDeleting ? "not-allowed" : "pointer",
-                  opacity: deleteModalState.isDeleting ? 0.7 : 1,
-                  fontSize: "14px",
-                }}
+                className="sup-btn-delete"
               >
                 {deleteModalState.isDeleting ? "กำลังลบ..." : "ตกลงลบ"}
               </button>
@@ -495,7 +368,6 @@ function AddSupplierScreen() {
   const [saving, setSaving] = useState(false);
   const [fetching, setFetching] = useState(false);
   
-  // State สำหรับดึงสินค้าทั้งหมดจาก DB มาเป็นตัวเลือก
   const [availableProducts, setAvailableProducts] = useState<string[]>([]);
   const [productInput, setProductInput] = useState("");
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
@@ -510,7 +382,6 @@ function AddSupplierScreen() {
     address: "",
   });
 
-  // โหลดรายการสินค้าที่มีอยู่ในคลังสำหรับใช้ใน Autocomplete
   useEffect(() => {
     async function loadProducts() {
       try {
@@ -519,7 +390,6 @@ function AddSupplierScreen() {
         const names = list
           .map((p) => (p.product_name || p.name || "").trim())
           .filter(Boolean);
-        // Deduplicate product names
         setAvailableProducts(Array.from(new Set(names)));
       } catch (err) {
         console.error("Failed to load products list:", err);
@@ -528,7 +398,6 @@ function AddSupplierScreen() {
     void loadProducts();
   }, []);
 
-  // ปิด Dropdown เมื่อคลิกข้างนอก
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -539,7 +408,6 @@ function AddSupplierScreen() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // โหลดรายละเอียดผู้จำหน่ายกรณีแก้ไข
   useEffect(() => {
     if (!supplierId) return;
 
@@ -577,7 +445,6 @@ function AddSupplierScreen() {
     void loadDetail();
   }, [supplierId]);
 
-  // ฟังก์ชันเพิ่มรายการสินค้า
   const addProductItem = (item: string) => {
     const trimmed = item.trim();
     if (!trimmed) return;
@@ -588,12 +455,10 @@ function AddSupplierScreen() {
     setIsDropdownOpen(false);
   };
 
-  // ฟังก์ชันลบรายการสินค้า
   const removeProductItem = (itemToRemove: string) => {
     setSelectedProducts(selectedProducts.filter((p) => p !== itemToRemove));
   };
 
-  // จัดการเมื่อกด Enter ในช่องกรอกสินค้า
   const handleProductKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -606,7 +471,6 @@ function AddSupplierScreen() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // รวมรายการสินค้าเป็น string เดียว คั่นด้วยจุลภาค
     const productsSuppliedStr = selectedProducts.join(", ");
 
     if (!formData.name.trim() || !productsSuppliedStr.trim()) return;
@@ -634,7 +498,6 @@ function AddSupplierScreen() {
     }
   };
 
-  // รายการตัวเลือกสินค้าที่กรองตามคำค้นหา
   const filteredProductOptions = availableProducts.filter((p) =>
     p.toLowerCase().includes(productInput.toLowerCase())
   );
@@ -643,31 +506,20 @@ function AddSupplierScreen() {
 
   return (
     <AdminShell active="suppliers">
-      <div style={{ width: "100%", padding: "12px 0" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
+      <div className="sup-form-wrapper">
+        <div className="sup-form-header">
           <button
             type="button"
             onClick={() => router.back()}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: "40px",
-              height: "40px",
-              borderRadius: "10px",
-              border: "1px solid #e2e8f0",
-              backgroundColor: "#fff",
-              color: "#475569",
-              cursor: "pointer",
-            }}
+            className="sup-back-btn"
           >
             <ArrowLeft size={20} />
           </button>
           <div>
-            <h1 style={{ fontSize: "20px", fontWeight: "bold", color: "#0f172a", margin: 0 }}>
+            <h1 className="sup-form-title">
               {supplierId ? "แก้ไขข้อมูลผู้จำหน่าย" : "เพิ่มผู้จำหน่ายใหม่"}
             </h1>
-            <p style={{ fontSize: "14px", color: "#64748b", margin: 0 }}>
+            <p className="sup-form-subtitle">
               {supplierId ? "แก้ไขรายละเอียดบริษัทคู่ค้า" : "ระบุข้อมูลบริษัทคู่ค้าสำหรับใช้ในระบบ"}
             </p>
           </div>
@@ -676,21 +528,10 @@ function AddSupplierScreen() {
         {fetching ? (
           <div style={{ padding: "40px", textAlign: "center", color: "#64748b" }}>กำลังโหลดข้อมูลเดิม...</div>
         ) : (
-          <form
-            onSubmit={handleSubmit}
-            style={{
-              backgroundColor: "#ffffff",
-              borderRadius: "16px",
-              border: "1px solid #e2e8f0",
-              padding: "24px",
-              display: "flex",
-              flexDirection: "column",
-              gap: "18px",
-            }}
-          >
+          <form onSubmit={handleSubmit} className="sup-form-container">
             <div>
-              <label style={{ display: "block", fontSize: "14px", fontWeight: "600", color: "#1e293b", marginBottom: "6px" }}>
-                ชื่อบริษัท / ผู้จำหน่าย <span style={{ color: "#ef4444" }}>*</span>
+              <label className="sup-form-label">
+                ชื่อบริษัท / ผู้จำหน่าย <span className="sup-required">*</span>
               </label>
               <input
                 type="text"
@@ -698,105 +539,49 @@ function AddSupplierScreen() {
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 placeholder="เช่น บริษัท สยามฟู้ดส์ จำกัด"
-                style={{
-                  width: "100%",
-                  padding: "10px 14px",
-                  borderRadius: "8px",
-                  border: "1px solid #cbd5e1",
-                  fontSize: "14px",
-                  fontFamily: "inherit",
-                  boxSizing: "border-box",
-                }}
+                className="sup-input"
               />
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+            <div className="sup-grid-2col">
               <div>
-                <label style={{ display: "block", fontSize: "14px", fontWeight: "600", color: "#1e293b", marginBottom: "6px" }}>
-                  เบอร์โทรศัพท์
-                </label>
+                <label className="sup-form-label">เบอร์โทรศัพท์</label>
                 <div style={{ position: "relative" }}>
                   <input
                     type="text"
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     placeholder="081-234-5678"
-                    style={{
-                      width: "100%",
-                      padding: "10px 14px 10px 40px",
-                      borderRadius: "8px",
-                      border: "1px solid #cbd5e1",
-                      fontSize: "14px",
-                      fontFamily: "inherit",
-                      boxSizing: "border-box",
-                    }}
+                    className="sup-input sup-input-icon"
                   />
-                  <Phone size={18} style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)", color: "#94a3b8" }} />
+                  <Phone size={18} className="sup-icon-left" />
                 </div>
               </div>
 
               <div>
-                <label style={{ display: "block", fontSize: "14px", fontWeight: "600", color: "#1e293b", marginBottom: "6px" }}>
-                  LINE ID
-                </label>
+                <label className="sup-form-label">LINE ID</label>
                 <div style={{ position: "relative" }}>
                   <input
                     type="text"
                     value={formData.lineId}
                     onChange={(e) => setFormData({ ...formData, lineId: e.target.value })}
                     placeholder="@supplier"
-                    style={{
-                      width: "100%",
-                      padding: "10px 14px 10px 40px",
-                      borderRadius: "8px",
-                      border: "1px solid #cbd5e1",
-                      fontSize: "14px",
-                      fontFamily: "inherit",
-                      boxSizing: "border-box",
-                    }}
+                    className="sup-input sup-input-icon"
                   />
-                  <MessageSquare size={18} style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)", color: "#94a3b8" }} />
+                  <MessageSquare size={18} className="sup-icon-left" />
                 </div>
               </div>
             </div>
 
-            {/* ส่วนของสินค้าที่จำหน่าย (พิมพ์ค้นหา / เลือกจากระบบ / พิมพ์สร้างใหม่) */}
+            {/* ส่วนของสินค้าที่จำหน่าย */}
             <div ref={dropdownRef} style={{ position: "relative" }}>
-              <label style={{ display: "block", fontSize: "14px", fontWeight: "600", color: "#1e293b", marginBottom: "6px" }}>
-                สินค้าที่จำหน่าย <span style={{ color: "#ef4444" }}>*</span>
+              <label className="sup-form-label">
+                สินค้าที่จำหน่าย <span className="sup-required">*</span>
               </label>
 
-              {/* Tag/Badge แสดงสินค้าที่ถูกเลือก */}
-              <div
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: "6px",
-                  padding: "8px 12px",
-                  border: "1px solid #cbd5e1",
-                  borderRadius: "8px",
-                  backgroundColor: "#ffffff",
-                  minHeight: "44px",
-                  alignItems: "center",
-                  cursor: "text",
-                }}
-                onClick={() => setIsDropdownOpen(true)}
-              >
+              <div className="sup-tag-container" onClick={() => setIsDropdownOpen(true)}>
                 {selectedProducts.map((p) => (
-                  <span
-                    key={p}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "4px",
-                      backgroundColor: "#e6f4ea",
-                      color: "#046c4e",
-                      padding: "4px 8px",
-                      borderRadius: "6px",
-                      fontSize: "13px",
-                      fontWeight: "500",
-                    }}
-                  >
+                  <span key={p} className="sup-tag-badge">
                     {p}
                     <button
                       type="button"
@@ -804,15 +589,7 @@ function AddSupplierScreen() {
                         e.stopPropagation();
                         removeProductItem(p);
                       }}
-                      style={{
-                        border: "none",
-                        background: "transparent",
-                        color: "#046c4e",
-                        cursor: "pointer",
-                        padding: 0,
-                        display: "flex",
-                        alignItems: "center",
-                      }}
+                      className="sup-tag-remove"
                     >
                       <X size={14} />
                     </button>
@@ -828,15 +605,8 @@ function AddSupplierScreen() {
                   }}
                   onFocus={() => setIsDropdownOpen(true)}
                   onKeyDown={handleProductKeyDown}
-                  placeholder={selectedProducts.length === 0 ? "พิมพ์ค้นหาสินค้า เช่น น้ำตาลทรายขาว หรือพิมพ์ชื่อใหม่แล้วกด Enter..." : "พิมพ์เพิ่ม..."}
-                  style={{
-                    border: "none",
-                    outline: "none",
-                    flex: 1,
-                    minWidth: "180px",
-                    fontSize: "14px",
-                    fontFamily: "inherit",
-                  }}
+                  placeholder={selectedProducts.length === 0 ? "พิมพ์ค้นหาสินค้า หรือพิมพ์ชื่อใหม่แล้วกด Enter..." : "พิมพ์เพิ่ม..."}
+                  className="sup-tag-input"
                 />
 
                 <ChevronDown size={18} style={{ color: "#94a3b8", cursor: "pointer" }} />
@@ -844,42 +614,12 @@ function AddSupplierScreen() {
 
               {/* Autocomplete Dropdown List */}
               {isDropdownOpen && (
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "100%",
-                    left: 0,
-                    right: 0,
-                    marginTop: "4px",
-                    backgroundColor: "#ffffff",
-                    border: "1px solid #cbd5e1",
-                    borderRadius: "8px",
-                    boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)",
-                    maxHeight: "220px",
-                    overflowY: "auto",
-                    zIndex: 50,
-                  }}
-                >
-                  {/* หากพิมพ์ชื่อสินค้าที่ยังไม่มีในรายการ ให้แสดงปุ่มสร้างใหม่ */}
+                <div className="sup-autocomplete-dropdown">
                   {productInput.trim() && !availableProducts.includes(productInput.trim()) && (
                     <button
                       type="button"
                       onClick={() => addProductItem(productInput)}
-                      style={{
-                        width: "100%",
-                        padding: "10px 14px",
-                        textAlign: "left",
-                        border: "none",
-                        borderBottom: "1px solid #f1f5f9",
-                        backgroundColor: "#f0fdf4",
-                        color: "#166534",
-                        fontSize: "14px",
-                        fontWeight: "600",
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                      }}
+                      className="sup-autocomplete-create-btn"
                     >
                       <Plus size={16} />
                       <span>เพิ่ม "{productInput.trim()}" เป็นสินค้าใหม่</span>
@@ -900,20 +640,7 @@ function AddSupplierScreen() {
                               addProductItem(product);
                             }
                           }}
-                          style={{
-                            width: "100%",
-                            padding: "10px 14px",
-                            textAlign: "left",
-                            border: "none",
-                            backgroundColor: isSelected ? "#f8fafc" : "#ffffff",
-                            color: isSelected ? "#046c4e" : "#1e293b",
-                            fontSize: "14px",
-                            fontWeight: isSelected ? "600" : "400",
-                            cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                          }}
+                          className={`sup-autocomplete-item ${isSelected ? "selected" : ""}`}
                         >
                           <span>{product}</span>
                           {isSelected && <Check size={16} style={{ color: "#046c4e" }} />}
@@ -932,61 +659,28 @@ function AddSupplierScreen() {
             </div>
 
             <div>
-              <label style={{ display: "block", fontSize: "14px", fontWeight: "600", color: "#1e293b", marginBottom: "6px" }}>
-                ที่อยู่
-              </label>
+              <label className="sup-form-label">ที่อยู่</label>
               <textarea
                 rows={3}
                 value={formData.address}
                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                 placeholder="ที่อยู่สำหรับออกใบเสร็จหรือจัดส่งสินค้า..."
-                style={{
-                  width: "100%",
-                  padding: "10px 14px",
-                  borderRadius: "8px",
-                  border: "1px solid #cbd5e1",
-                  fontSize: "14px",
-                  fontFamily: "inherit",
-                  resize: "none",
-                  boxSizing: "border-box",
-                }}
+                className="sup-textarea"
               />
             </div>
 
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "10px" }}>
+            <div className="sup-form-footer">
               <button
                 type="button"
                 onClick={() => router.back()}
-                style={{
-                  padding: "10px 20px",
-                  borderRadius: "8px",
-                  border: "1px solid #cbd5e1",
-                  backgroundColor: "#fff",
-                  color: "#475569",
-                  fontWeight: "500",
-                  cursor: "pointer",
-                  fontSize: "14px",
-                }}
+                className="sup-btn-cancel"
               >
                 ยกเลิก
               </button>
               <button
                 type="submit"
                 disabled={isFormInvalid}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  padding: "10px 24px",
-                  borderRadius: "8px",
-                  backgroundColor: "#046c4e",
-                  color: "#ffffff",
-                  border: "none",
-                  fontWeight: "500",
-                  cursor: isFormInvalid ? "not-allowed" : "pointer",
-                  opacity: isFormInvalid ? 0.6 : 1,
-                  fontSize: "14px",
-                }}
+                className="sup-btn-submit"
               >
                 <Save size={18} />
                 <span>{saving ? "กำลังบันทึก..." : "บันทึกข้อมูล"}</span>
