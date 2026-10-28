@@ -5,7 +5,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import AdminShell from "../_components/AdminShell";
-import { PageTitle, Stat } from "../_components/PageElements";
+import { Stat } from "../_components/PageElements";
 import { apiFetch, errorMessage } from "../_lib/api";
 
 type Product = {
@@ -181,11 +181,17 @@ export default function InventoryOrderCreateScreen() {
 
   return <>
     <AdminShell active="inventory-orders" contentClassName="inventory-order-create-page">
-    <PageTitle
-      title="สร้างใบคำสั่งซื้อ"
-      subtitle="ตรวจสอบรายการที่พักไว้ แก้ไขจำนวน และสร้างใบสั่งซื้อแยกตาม Supplier เมื่อยืนยัน"
-      action={<Link className="secondary-button" href="/recommendations"><ArrowLeft size={16} /> กลับหน้าแนะนำ</Link>}
-    />
+    <div className="subpage-heading inventory-order-create-page-heading">
+      <Link
+        className="inventory-order-create-back"
+        href="/inventory-orders"
+        aria-label="กลับหน้าคำสั่งซื้อ"
+        title="กลับหน้าคำสั่งซื้อ"
+      >
+        <ArrowLeft size={20} />
+      </Link>
+      <div><h1>สร้างใบคำสั่งซื้อ</h1><p>ตรวจสอบรายการที่พักไว้ แก้ไขจำนวน และสร้างใบสั่งซื้อแยกตาม Supplier เมื่อยืนยัน</p></div>
+    </div>
 
     <div className="stat-grid four inventory-order-create-stats">
       <Stat label="สินค้าที่พักไว้" value={`${heldItems.length} รายการ`} />
@@ -208,6 +214,9 @@ export default function InventoryOrderCreateScreen() {
     </AdminShell>
     <style jsx global>{`
       .inventory-order-create-page { max-width: 1440px; padding: 30px 40px 56px; }
+      .inventory-order-create-page-heading { justify-content: flex-start; align-items: flex-start; }
+      .inventory-order-create-page-heading > div { min-width: 0; }
+      .inventory-order-create-back { width: 40px; height: 40px; flex: 0 0 40px; display: flex; align-items: center; justify-content: center; border: 1px solid #e2e8f0; border-radius: 10px; color: #475569; background: #fff; cursor: pointer; text-decoration: none; box-sizing: border-box; }
       .inventory-order-create-page-shell { margin-top: 20px; }
       .inventory-order-create-page-toolbar { display: grid; grid-template-columns: minmax(260px, 1fr) 180px 180px; gap: 12px; padding: 16px; border: 1px solid var(--border); border-bottom: 0; border-radius: 12px 12px 0 0; background: #f4f7ff; }
       .inventory-order-create-search { min-width: 0; height: 42px; padding: 0 12px; display: flex; align-items: center; gap: 8px; border: 1px solid var(--border); border-radius: 7px; color: var(--muted); background: #fff; }
@@ -263,7 +272,7 @@ export default function InventoryOrderCreateScreen() {
       .inventory-order-create-footer > span { color: var(--muted); font-size: 10px; }
       .inventory-order-create-footer .primary-button { min-height: 38px; padding: 0 13px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
       @media (max-width: 1020px) { .inventory-order-create-page-layout { grid-template-columns: 1fr; } }
-      @media (max-width: 720px) { .inventory-order-create-page { padding: 22px 16px 42px; }.inventory-order-create-page-toolbar { grid-template-columns: 1fr; }.inventory-order-product-row { grid-template-columns: 40px minmax(0, 1fr) auto; }.inventory-order-product-row > button { grid-column: 2 / -1; justify-self: start; }.inventory-order-create-footer { align-items: flex-start; flex-direction: column; }.inventory-order-create-footer .primary-button { width: 100%; } }
+      @media (max-width: 720px) { .inventory-order-create-page { padding: 22px 16px 42px; }.inventory-order-create-page-heading { align-items: flex-start; }.inventory-order-create-page-toolbar { grid-template-columns: 1fr; }.inventory-order-product-row { grid-template-columns: 40px minmax(0, 1fr) auto; }.inventory-order-product-row > button { grid-column: 2 / -1; justify-self: start; }.inventory-order-create-footer { align-items: flex-start; flex-direction: column; }.inventory-order-create-footer .primary-button { width: 100%; } }
     `}</style>
   </>;
 }

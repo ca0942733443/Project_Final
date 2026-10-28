@@ -492,7 +492,7 @@ html.dark-mode .section-inventory .inventory-table .expired-row { color: #ffffff
 .section-inventory-orders { max-width: 1440px; padding: 30px 40px 56px; }
 .section-inventory-orders > .subpage-heading { width: 100%; max-width: none; min-height: 56px; margin-bottom: 24px; align-items: center; }
 .section-inventory-orders > .subpage-heading h1 { font-size: 30px; letter-spacing: -.5px; }.section-inventory-orders > .subpage-heading p { font-size: 13px; }
-.inventory-order-create-button { min-height: 41px; }
+.inventory-order-create-button { min-height: 41px; text-decoration: none; }
 .inventory-order-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 24px; }
 .inventory-order-summary-card { min-height: 136px; padding: 20px; border: 1px solid var(--border); border-radius: 11px; background: #fff; box-shadow: 0 2px 8px rgba(19,42,30,.03); }
 .inventory-order-summary-card > span { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; font-weight: 600; }.inventory-order-summary-card > span svg { color: var(--green); }.inventory-order-summary-card strong { display: block; margin-top: 14px; color: var(--ink); font-size: 28px; letter-spacing: -.5px; }.inventory-order-summary-card small { display: block; margin-top: 7px; color: var(--muted); font-size: 10px; }.inventory-order-summary-card.is-pending > span svg, .inventory-order-summary-card.is-pending strong { color: #b36a00; }.inventory-order-summary-card.is-approved > span svg, .inventory-order-summary-card.is-approved strong { color: #087a57; }.inventory-order-summary-card.is-quantity > span svg, .inventory-order-summary-card.is-quantity strong { color: #3474a1; }
