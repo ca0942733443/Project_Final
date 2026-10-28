@@ -505,7 +505,7 @@ function AddSupplierScreen() {
   const isFormInvalid = !formData.name.trim() || selectedProducts.length === 0 || saving;
 
   return (
-    <AdminShell active="suppliers">
+    <AdminShell active="suppliers" contentClassName="shared-form-page">
       <div className="sup-form-wrapper">
         <div className="sup-form-header">
           <button
@@ -546,7 +546,7 @@ function AddSupplierScreen() {
             <div className="sup-grid-2col">
               <div>
                 <label className="sup-form-label">เบอร์โทรศัพท์</label>
-                <div style={{ position: "relative" }}>
+                <div className="sup-input-wrap">
                   <input
                     type="text"
                     value={formData.phone}
@@ -560,7 +560,7 @@ function AddSupplierScreen() {
 
               <div>
                 <label className="sup-form-label">LINE ID</label>
-                <div style={{ position: "relative" }}>
+                <div className="sup-input-wrap">
                   <input
                     type="text"
                     value={formData.lineId}
