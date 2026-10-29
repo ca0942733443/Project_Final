@@ -451,7 +451,7 @@ function AddProductForm({ parentId, onBack }: AddProductScreenProps) {
         </div>
 
         {/* SECTION 2: ราคาและจำนวนสต็อก */}
-        <div className="ap-section-card">
+        {/* <div className="ap-section-card">
           <h3 className="ap-section-title">
             2. ราคาและจำนวนสต็อก
           </h3>
@@ -519,14 +519,14 @@ function AddProductForm({ parentId, onBack }: AddProductScreenProps) {
               />
             </div>
           </div>
-        </div>
+        </div> */}
 
         {/* SECTION 3: การจัดการแจ้งเตือนสต็อก */}
         <div className="ap-section-card">
           <div className="ap-notification-header">
             <h3 className="ap-section-title" style={{ margin: 0 }}>
               <Bell size={18} className="ap-bell-icon" />
-              3. การจัดการแจ้งเตือนสต็อก
+              2. การจัดการแจ้งเตือนสต็อก
             </h3>
 
             <label className="ap-checkbox-label">

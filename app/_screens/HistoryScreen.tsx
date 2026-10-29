@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDown, ArrowDownUp, ArrowUp, ChevronLeft, ChevronRight, Printer } from "lucide-react";
+import { ArrowDown, ArrowDownUp, ArrowUp, Printer } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 import AdminShell from "../_components/AdminShell";
 import { PageTitle } from "../_components/PageElements";
@@ -48,8 +48,11 @@ export default function HistoryScreen() {
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("createdAt");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 5;
 
   const loadOrders = async (filterOverrides: Partial<OrderFilters> = {}) => {
+    setCurrentPage(1);
     setLoading(true);
     setError("");
     const filters: OrderFilters = { dateFrom, dateTo, paymentMethod, orderStatus, ...filterOverrides };
@@ -100,6 +103,17 @@ export default function HistoryScreen() {
     if (comparison === 0) return right.id - left.id;
     return sortDirection === "asc" ? comparison : -comparison;
   });
+  const totalPages = Math.max(1, Math.ceil(sortedOrders.length / pageSize));
+  const pageTokens: Array<number | "ellipsis-left" | "ellipsis-right"> = totalPages <= 5
+    ? Array.from({ length: totalPages }, (_, index) => index + 1)
+    : currentPage <= 3
+      ? [1, 2, 3, 4, 5]
+      : currentPage >= totalPages - 2
+        ? ["ellipsis-left", totalPages - 3, totalPages - 2, totalPages - 1, totalPages]
+        : ["ellipsis-left", currentPage - 1, currentPage, currentPage + 1, "ellipsis-right"];
+  const pageOrders = sortedOrders.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const firstVisibleOrder = pageOrders.length ? (currentPage - 1) * pageSize + 1 : 0;
+  const lastVisibleOrder = Math.min(currentPage * pageSize, sortedOrders.length);
 
   const openReceipt = async (order: Order) => {
     type OrderDetail = { 
@@ -141,9 +155,11 @@ export default function HistoryScreen() {
     <section className="data-card history-card">
       {loading && <div className="api-message">กำลังโหลดประวัติการขาย...</div>}
       {error && <div className="api-message error">{error}</div>}
-      <div className="table-wrap"><table><thead><tr>{sortableColumns.map(({ key, label }) => <th key={key} aria-sort={sortKey === key ? sortDirection === "asc" ? "ascending" : "descending" : "none"}><button type="button" className="sort-button" title={`เรียงตาม${label}`} aria-label={`เรียงตาม${label}${sortKey === key ? (sortDirection === "asc" ? " จากน้อยไปมาก" : "จากมากไปน้อย") : ""}`} onClick={() => sortOrders(key)}>{label}{sortKey === key ? (sortDirection === "asc" ? <ArrowUp size={14} aria-hidden="true" /> : <ArrowDown size={14} aria-hidden="true" />) : <ArrowDownUp size={14} aria-hidden="true" />}</button></th>)}<th aria-label="การจัดการ" /></tr></thead><tbody>{sortedOrders.slice(0, 4).map(order => <tr key={order.id}><td>{order.orderNumber}</td><td>{new Date(order.createdAt).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}</td><td>฿{order.total.toLocaleString("th-TH", { minimumFractionDigits: 2 })}</td><td>{order.paymentMethod ? methodLabels[order.paymentMethod] : "–"}</td><td><span className={order.status === "paid" ? "success-pill" : order.status === "credit" ? "status-pill s-3" : "status-pill s-2"}>● {statusLabels[order.status]}</span></td><td><button type="button" className="tiny-button" aria-label={`เปิดใบเสร็จ ${order.orderNumber}`} onClick={() => void openReceipt(order)}><Printer size={17} /></button></td></tr>)}</tbody></table></div>
+      <div className="table-wrap"><table><thead><tr>{sortableColumns.map(({ key, label }) => <th key={key} aria-sort={sortKey === key ? sortDirection === "asc" ? "ascending" : "descending" : "none"}><button type="button" className="sort-button" title={`เรียงตาม${label}`} aria-label={`เรียงตาม${label}${sortKey === key ? (sortDirection === "asc" ? " จากน้อยไปมาก" : "จากมากไปน้อย") : ""}`} onClick={() => sortOrders(key)}>{label}{sortKey === key ? (sortDirection === "asc" ? <ArrowUp size={14} aria-hidden="true" /> : <ArrowDown size={14} aria-hidden="true" />) : <ArrowDownUp size={14} aria-hidden="true" />}</button></th>)}<th aria-label="การจัดการ" /></tr></thead><tbody>{pageOrders.map(order => <tr key={order.id}><td>{order.orderNumber}</td><td>{new Date(order.createdAt).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}</td><td>฿{order.total.toLocaleString("th-TH", { minimumFractionDigits: 2 })}</td><td>{order.paymentMethod ? methodLabels[order.paymentMethod] : "–"}</td><td><span className={order.status === "paid" ? "success-pill" : order.status === "credit" ? "status-pill s-3" : "status-pill s-2"}>● {statusLabels[order.status]}</span></td><td><button type="button" className="tiny-button" aria-label={`เปิดใบเสร็จ ${order.orderNumber}`} onClick={() => void openReceipt(order)}><Printer size={17} /></button></td></tr>)}</tbody></table></div>
       {!loading && data?.items.length === 0 && <div className="api-message">ไม่พบรายการขายในช่วงที่เลือก</div>}
-      <div className="pagination"><span>แสดง {data?.items.length ? 1 : 0}-{Math.min(4, data?.items.length ?? 0)} จาก {data?.summary.orderCount ?? 0} รายการ</span><div><button aria-label="หน้าก่อนหน้า"><ChevronLeft size={17}/></button><button className="selected" aria-current="page">1</button><button>2</button><button>3</button><button aria-label="หน้าถัดไป"><ChevronRight size={17}/></button></div></div>
+      <div className="pagination"><span>แสดง {firstVisibleOrder}-{lastVisibleOrder} จาก {data?.summary.orderCount ?? 0} รายการ</span><div aria-label="เปลี่ยนหน้ารายการย้อนหลัง">{pageTokens.map((token, index) => typeof token === "number"
+        ? <button key={token} className={currentPage === token ? "selected" : ""} aria-current={currentPage === token ? "page" : undefined} aria-label={`หน้า ${token}`} onClick={() => setCurrentPage(token)}>{token}</button>
+        : <span className="page-ellipsis" key={token + index} aria-hidden="true">...</span>)}</div></div>
     </section>
     {receipt && <ReceiptModal receipt={receipt} autoPrint onClose={() => setReceipt(null)} />}
   </AdminShell>;

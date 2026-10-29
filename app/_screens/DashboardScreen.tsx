@@ -121,23 +121,41 @@ function CompactBarChart({ rows }: { rows: SeriesRow[] }) {
   const hourlyRows = Array.from({ length: 24 }, (_, hour) => {
     const label = `${String(hour).padStart(2, "0")}:00`;
     return { label, orderCount: Number(rowsByHour.get(String(hour).padStart(2, "0"))?.orderCount) || 0 };
-  });
-  const maximum = Math.max(...hourlyRows.map((row) => row.orderCount), 1);
+  }).filter((row) => row.orderCount > 0);
+  const maximumCount = Math.max(...hourlyRows.map((row) => row.orderCount), 0);
+  const tickStep = Math.max(1, Math.ceil(maximumCount / 4));
+  const axisMaximum = Math.max(tickStep * 4, Math.ceil(maximumCount / tickStep) * tickStep);
+  const yTicks = Array.from({ length: axisMaximum / tickStep + 1 }, (_, index) => index * tickStep);
+  const plot = { left: 40, right: 896, top: 18, bottom: 230 };
+  const slotWidth = hourlyRows.length ? (plot.right - plot.left) / hourlyRows.length : plot.right - plot.left;
+  const barWidth = Math.min(58, slotWidth * 0.72);
+  const fullCenterSpan = Math.max(0, plot.right - plot.left - barWidth);
+  const compactCenterSpan = Math.min(fullCenterSpan, Math.max(fullCenterSpan * 0.5, (hourlyRows.length - 1) * (barWidth + 8)));
+  const xFor = (index: number) => hourlyRows.length === 1
+    ? (plot.left + plot.right) / 2
+    : (plot.left + plot.right) / 2 - compactCenterSpan / 2 + barWidth / 2 + (index / (hourlyRows.length - 1)) * compactCenterSpan;
+  const yFor = (count: number) => plot.bottom - (count / axisMaximum) * (plot.bottom - plot.top);
   return (
     <div className="hourly-chart">
-      {hourlyRows.map((row) => {
-        const billCount = row.orderCount;
-        const ratio = billCount / maximum;
-        const shadeClass = ratio >= 0.75 ? "shade-3" : ratio >= 0.4 ? "shade-2" : ratio >= 0.15 ? "shade-1" : "shade-0";
-        const barHeight = billCount ? `${Math.max(8, ratio * 160)}px` : "0px";
-        return (
-          <div className="hour-column" key={row.label} style={{ "--bar-height": barHeight } as CSSProperties}>
-            {billCount > 0 && <small className="hour-count-label">{billCount}</small>}
-            <div className={`hour-bar ${shadeClass}`} style={{ height: barHeight }} title={`${row.label}: ${billCount} บิล`} />
-            <span className="db-hour-label">{row.label}</span>
-          </div>
-        );
-      })}
+      <svg className="hourly-scatter-svg" viewBox="0 0 900 280" role="img" aria-label="กราฟแท่งจำนวนบิลตามเวลา ตั้งแต่ 00:00 ถึง 23:00">
+        {yTicks.map((tick) => {
+          const y = yFor(tick);
+          return <g key={tick}>
+            <line className="hourly-gridline" x1={plot.left} x2={plot.right} y1={y} y2={y} />
+            <text className="hourly-y-tick" x={plot.left - 8} y={y + 4} textAnchor="end">{tick}</text>
+          </g>;
+        })}
+        {hourlyRows.map((row, index) => {
+          const ratio = row.orderCount / Math.max(maximumCount, 1);
+          const fill = ratio >= 0.75 ? "#006c49" : ratio >= 0.4 ? "rgba(0,108,73,.7)" : ratio >= 0.15 ? "rgba(0,108,73,.4)" : "rgba(0,108,73,.1)";
+          return <g key={row.label}>
+            <rect className="hourly-bar-rect" x={xFor(index) - barWidth / 2} y={yFor(row.orderCount)} width={barWidth} height={Math.max(1, plot.bottom - yFor(row.orderCount))} style={{ fill }}>
+              <title>{`${row.label}: ${row.orderCount} บิล`}</title>
+            </rect>
+            <text className="hourly-x-tick" x={xFor(index)} y="264" textAnchor="middle">{row.label}</text>
+          </g>;
+        })}
+      </svg>
     </div>
   );
 }
@@ -268,7 +286,7 @@ export default function DashboardScreen() {
         </Panel>
       </div>
 
-      <Panel title="สินค้าขายดี" action={<ViewAll href="/best-sellers?period=month" />} className="table-panel dashboard-table">
+      <Panel title="สินค้าขายดี (5 อันดับแรก)" action={<ViewAll href={`/best-sellers?period=${period}`} />} className="table-panel dashboard-table">
         <div className="table-wrap">
           <table>
             <thead>

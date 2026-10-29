@@ -385,17 +385,20 @@ export default function PosScreen() {
 
               {/* หมวดหมู่อย่อย (ถ้ามี) */}
               {category !== "ALL" && (selectedCategory?.subCategories?.length ?? 0) > 0 && (
-                <div className="pos-subcategory-scroll">
-                  {[{ id: "ALL", name: "ทุกหมวดย่อย" }, ...(selectedCategory?.subCategories ?? []).map((item) => ({ id: String(item.id), name: item.name }))].map((item) => (
-                    <button
-                      type="button"
-                      className={`pos-btn-subcategory ${subCategory === item.id ? "selected" : ""}`}
-                      onClick={() => handleSubCategoryChange(item.id)}
-                      key={item.id}
-                    >
-                      {item.name}
-                    </button>
-                  ))}
+                <div className="pos-subcategory-section">
+                  <span className="pos-subcategory-heading">หมวดหมู่ย่อย</span>
+                  <div className="pos-subcategory-scroll" role="group" aria-label="เลือกหมวดหมู่ย่อย">
+                    {[{ id: "ALL", name: "ทั้งหมด" }, ...(selectedCategory?.subCategories ?? []).map((item) => ({ id: String(item.id), name: item.name }))].map((item) => (
+                      <button
+                        type="button"
+                        className={`pos-btn-category pos-btn-subcategory ${subCategory === item.id ? "selected" : ""}`}
+                        onClick={() => handleSubCategoryChange(item.id)}
+                        key={item.id}
+                      >
+                        {item.name}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
 
