@@ -19,8 +19,17 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { apiFetch } from "../_lib/api";
+import { buildNotificationAlerts, loadNotificationState, NOTIFICATION_STATE_CHANGED, type InventoryNotificationItem, type NotificationAlert } from "../_lib/notifications";
 
 export const THEME_STORAGE_KEY = "captain-gai-sod-theme";
+
+type NotificationInventory = { items: InventoryNotificationItem[] };
+
+function unreadNotificationCount(alerts: NotificationAlert[]) {
+  const state = loadNotificationState();
+  return alerts.filter((alert) => !state.dismissed.includes(alert.id) && !state.read.includes(alert.id)).length;
+}
 
 export type AdminSection =
   | "dashboard"
@@ -41,7 +50,7 @@ export type AdminSection =
 const navigation = [
   ["dashboard", "แดชบอร์ดสรุปรายได้", LayoutDashboard, "/"],
   ["pos", "หน้าจอขายหน้าร้าน", Store, "/pos"],
-  ["suppliers", "จัดการ Supplier", Truck, "/suppliers"],
+  ["suppliers", "จัดการผู้จำหน่าย", Truck, "/suppliers"],
   ["stock", "จัดการสต็อก", Warehouse, "/stock"], // 🟢 เพิ่มเมนู "จัดการสต็อก" ตรงนี้
   ["inventory-orders", "คำสั่งซื้อสินค้าคงคลัง", ClipboardList, "/inventory-orders"],
   ["recommendations", "ระบบแนะนำการสั่งซื้อ", Lightbulb, "/recommendations"],
@@ -62,6 +71,7 @@ export default function AdminShell({
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [user, setUser] = useState<{ fullName: string; role: "owner" | "cashier" | "stock" } | null>(null);
+  const [notificationCount, setNotificationCount] = useState(0);
   const terminalTitle = "POS Terminal";
   const roleLabel = user?.role === "cashier" ? "แคชเชียร์" : user?.role === "stock" ? "พนักงานคลัง" : "เจ้าของร้าน";
 
@@ -74,6 +84,25 @@ export default function AdminShell({
   useEffect(() => {
     const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
     document.documentElement.classList.toggle("dark-mode", storedTheme === "dark");
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    let alerts: NotificationAlert[] = [];
+    const syncCount = () => setNotificationCount(unreadNotificationCount(alerts));
+    apiFetch<NotificationInventory>("/inventory")
+      .then(({ items }) => {
+        alerts = buildNotificationAlerts(items);
+        if (!cancelled) syncCount();
+      })
+      .catch(() => {
+        if (!cancelled) setNotificationCount(0);
+      });
+    window.addEventListener(NOTIFICATION_STATE_CHANGED, syncCount);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(NOTIFICATION_STATE_CHANGED, syncCount);
+    };
   }, []);
 
   const logout = () => {
@@ -117,7 +146,7 @@ export default function AdminShell({
           <button className="menu-button" onClick={() => setMenuOpen(true)} aria-label="เปิดเมนู"><Menu /></button>
           <strong className="terminal">{terminalTitle}</strong>
           <label className="search"><Search size={15} /><input aria-label="ค้นหา" placeholder={active === "customers" ? "ค้นหารายชื่อลูกค้า..." : "ค้นหา..."} /></label>
-          <Link className={`icon-button ${active === "notifications" ? "header-active" : ""}`} aria-label="การแจ้งเตือน" href="/notifications"><Bell size={17} /></Link>
+          <Link className={`icon-button notification-bell ${active === "notifications" ? "header-active" : ""}`} aria-label={`การแจ้งเตือน ${notificationCount} รายการ`} href="/notifications"><Bell size={17} />{notificationCount > 0 && <span className="notification-badge">{notificationCount > 99 ? "99+" : notificationCount}</span>}</Link>
           <Link className={`icon-button ${active === "history" ? "header-active" : ""}`} aria-label="ประวัติ" href="/history"><Clock3 size={17} /></Link>
           {profileButton}
         </header>

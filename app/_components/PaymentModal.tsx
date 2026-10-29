@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Banknote, CheckCircle2, CirclePlus, CreditCard, Delete, Info, QrCode, Search, X } from "lucide-react";
+import { ArrowLeft, Banknote, CheckCircle2, CircleMinus, CirclePlus, CreditCard, Delete, Info, QrCode, Search, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { buildPromptPayPayload, defaultPaymentSettings, loadPaymentSettings, PAYMENT_SETTINGS_CHANGED_EVENT, PaymentSettings } from "../_lib/payment";
@@ -225,7 +225,7 @@ export default function PaymentModal({ orderNumber, total, onClose, onConfirm }:
               <strong>฿ {payableTotal.toFixed(2)}</strong>
             </div>
 
-            {method === "cash" && <button className="payment-discount" type="button" onClick={openDiscount} style={{ cursor: "pointer" }}><CirclePlus size={19}/> {appliedDiscount ? `ส่วนลด ฿${appliedDiscount.toFixed(2)} · แก้ไข` : "เพิ่มส่วนลด"}</button>}
+            <button className="payment-discount" type="button" onClick={() => discountOpen ? setDiscountOpen(false) : openDiscount()} style={{ cursor: "pointer" }}>{discountOpen ? <CircleMinus size={19} /> : <CirclePlus size={19} />} {discountOpen ? "ปิดส่วนลด" : appliedDiscount ? `ส่วนลด ฿${appliedDiscount.toFixed(2)} · แก้ไข` : "เพิ่มส่วนลด"}</button>
 
             <div className="payment-methods payment-methods-with-credit">
               <h3>เลือกวิธีการชำระเงิน</h3>

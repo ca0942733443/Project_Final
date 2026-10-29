@@ -1,7 +1,8 @@
 "use client";
 
 import { Check, Printer, Award } from "lucide-react";
-import { useEffect } from "react";
+import { createPortal } from "react-dom";
+import { useEffect, useState } from "react";
 
 export type ReceiptData = {
   orderNumber: string;
@@ -27,13 +28,19 @@ type ReceiptModalProps = {
 };
 
 export default function ReceiptModal({ receipt, success = false, autoPrint = false, onClose }: ReceiptModalProps) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
+
   useEffect(() => {
     if (!autoPrint) return;
     const timer = window.setTimeout(() => window.print(), 300);
     return () => window.clearTimeout(timer);
   }, [autoPrint]);
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal((
     <div className="receipt-backdrop" role="presentation">
       <section className={`receipt-modal ${success ? "receipt-success" : ""}`} aria-modal="true" role="dialog">
         {success && (
@@ -88,7 +95,7 @@ export default function ReceiptModal({ receipt, success = false, autoPrint = fal
           </div>
 
           {receipt.pointsEarned !== undefined && receipt.pointsEarned > 0 && (
-            <div style={{
+            <div className="receipt-points" style={{
               marginTop: "14px",
               padding: "10px 12px",
               backgroundColor: "#f0fdf4",
@@ -120,5 +127,5 @@ export default function ReceiptModal({ receipt, success = false, autoPrint = fal
         </div>
       </section>
     </div>
-  );
+  ), document.body);
 }

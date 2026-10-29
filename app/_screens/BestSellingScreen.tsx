@@ -68,7 +68,7 @@ export default function BestSellingScreen() {
 
   return (
     <AdminShell active="dashboard">
-      <div className="subpage-heading">
+      <div className="subpage-heading best-sellers-page-heading">
         <div className="best-sellers-heading-copy">
           <button
             type="button"
@@ -78,7 +78,7 @@ export default function BestSellingScreen() {
             <ArrowLeft size={20} />
           </button>
           <div>
-            <h1>สินค้าขายดีทั้งหมด</h1>
+            <h1>สินค้าที่ขายทั้งหมด</h1>
             <p>สินค้าทุกรายการที่ขายได้ในช่วง{periodLabels[period]} เรียงตามรายได้</p>
           </div>
         </div>
@@ -96,7 +96,7 @@ export default function BestSellingScreen() {
 
       <section className="panel table-panel dashboard-table best-sellers-panel">
         <div className="panel-title">
-          <h2>รายการสินค้าขายดี</h2>
+          <h2>รายการสินค้าที่ขายทั้งหมด</h2>
         </div>
         <div className="table-wrap">
           <table>
