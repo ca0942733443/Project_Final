@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="1120" viewBox="0 0 2400 1120" role="img" aria-label="แผนผังสี่ฟังก์ชันพร้อมฟังก์ชันย่อย">
+  <defs>
+    <pattern id="dot-grid" width="20" height="20" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.6" fill="#e8e8e4"/>
+    </pattern>
+    <style>
+      .bg { fill: #fff; }
+      .grid { fill: url(#dot-grid); }
+      .line { fill: none; stroke: #77766f; stroke-width: 2.5; stroke-linecap: square; stroke-linejoin: miter; }
+      .box { stroke-width: 1.8; rx: 2; }
+      .owner { fill: #fff2c9; stroke: #c6b77e; }
+      .header { fill: #fff; stroke: #aaa89f; }
+      .done { fill: #a9d98e; stroke: #78b25d; }
+      .alert { fill: #ffc5c5; stroke: #dc4c4c; }
+      .txt { font-family: Tahoma, "Leelawadee UI", sans-serif; fill: #302d28; text-anchor: middle; dominant-baseline: middle; }
+      .owner-text { font-size: 29px; font-weight: 700; }
+      .header-text { font-size: 25px; font-weight: 700; }
+      .task-text { font-size: 21px; }
+      .legend-text { font-size: 24px; text-anchor: start; }
+    </style>
+  </defs>
+
+  <rect class="bg" width="2400" height="1120"/>
+  <rect class="grid" width="2400" height="1120"/>
+
+  <rect class="box owner" x="1090" y="45" width="220" height="65"/>
+  <text class="txt owner-text" x="1200" y="78">เจ้าของร้าน</text>
+
+  <path class="line" d="M1200 110 V175 M300 175 H2100 M300 175 V235 M900 175 V235 M1500 175 V235 M2100 175 V235"/>
+
+  <!-- คำสั่งซื้อสินค้าคงคลัง -->
+  <rect class="box header" x="70" y="235" width="460" height="62"/>
+  <text class="txt header-text" x="300" y="266">คำสั่งซื้อสินค้าคงคลัง</text>
+  <path class="line" d="M300 297 V340 H120 V862 M120 361 H150 M120 429 H150 M120 497 H150 M120 565 H150 M120 633 H150 M120 701 H150 M120 769 H150 M120 837 H150"/>
+  <rect class="box done" x="150" y="336" width="360" height="50"/>
+  <text class="txt task-text" x="330" y="361">เพิ่มคำสั่งซื้อ</text>
+  <rect class="box done" x="150" y="404" width="360" height="50"/>
+  <text class="txt task-text" x="330" y="429">ค้นหาและกรองคำสั่งซื้อ</text>
+  <rect class="box done" x="150" y="472" width="360" height="50"/>
+  <text class="txt task-text" x="330" y="497">ดูรายละเอียดและพิมพ์ PO</text>
+  <rect class="box done" x="150" y="540" width="360" height="50"/>
+  <text class="txt task-text" x="330" y="565">ส่งคำสั่งซื้อเพื่ออนุมัติ</text>
+  <rect class="box done" x="150" y="608" width="360" height="50"/>
+  <text class="txt task-text" x="330" y="633">อนุมัติ/ไม่อนุมัติ</text>
+  <rect class="box done" x="150" y="676" width="360" height="50"/>
+  <text class="txt task-text" x="330" y="701">รับสินค้าเข้าสต็อก</text>
+  <rect class="box alert" x="150" y="744" width="360" height="50"/>
+  <text class="txt task-text" x="330" y="769">แก้ไขรายการสินค้าในคำสั่งซื้อ</text>
+  <rect class="box alert" x="150" y="812" width="360" height="50"/>
+  <text class="txt task-text" x="330" y="837">ลบคำสั่งซื้อ</text>
+
+  <!-- ระบบแนะนำการสั่งซื้อ -->
+  <rect class="box header" x="670" y="235" width="460" height="62"/>
+  <text class="txt header-text" x="900" y="266">ระบบแนะนำการสั่งซื้อ</text>
+  <path class="line" d="M900 297 V340 H720 V794 M720 361 H750 M720 429 H750 M720 497 H750 M720 565 H750 M720 633 H750 M720 701 H750 M720 769 H750"/>
+  <rect class="box done" x="750" y="336" width="360" height="50"/>
+  <text class="txt task-text" x="930" y="361">แนะนำเติมสินค้าตามยอดขาย</text>
+  <rect class="box done" x="750" y="404" width="360" height="50"/>
+  <text class="txt task-text" x="930" y="429">แนะนำลูกค้าที่ควรติดตาม</text>
+  <rect class="box done" x="750" y="472" width="360" height="50"/>
+  <text class="txt task-text" x="930" y="497">กรองจำนวนวันที่ไม่ซื้อซ้ำ</text>
+  <rect class="box done" x="750" y="540" width="360" height="50"/>
+  <text class="txt task-text" x="930" y="565">ส่งออกข้อมูล CSV</text>
+  <rect class="box done" x="750" y="608" width="360" height="50"/>
+  <text class="txt task-text" x="930" y="633">พักรายการสั่งซื้อ</text>
+  <rect class="box done" x="750" y="676" width="360" height="50"/>
+  <text class="txt task-text" x="930" y="701">สร้างใบสั่งซื้อต่อ</text>
+  <rect class="box alert" x="750" y="744" width="360" height="50"/>
+  <text class="txt task-text" x="930" y="769">บันทึกสถานะเตรียมสินค้าลูกค้า</text>
+
+  <!-- บัญชีขายเชื่อและลูกค้าประจำ -->
+  <rect class="box header" x="1270" y="235" width="460" height="62"/>
+  <text class="txt header-text" x="1500" y="266">บัญชีขายเชื่อ &amp; ลูกค้าประจำ</text>
+  <path class="line" d="M1500 297 V340 H1320 V862 M1320 361 H1350 M1320 429 H1350 M1320 497 H1350 M1320 565 H1350 M1320 633 H1350 M1320 701 H1350 M1320 769 H1350 M1320 837 H1350"/>
+  <rect class="box done" x="1350" y="336" width="360" height="50"/>
+  <text class="txt task-text" x="1530" y="361">เพิ่มลูกค้าและบัญชีขายเชื่อ</text>
+  <rect class="box done" x="1350" y="404" width="360" height="50"/>
+  <text class="txt task-text" x="1530" y="429">แก้ไขข้อมูลและวงเงิน</text>
+  <rect class="box done" x="1350" y="472" width="360" height="50"/>
+  <text class="txt task-text" x="1530" y="497">ปิดใช้งานลูกค้า</text>
+  <rect class="box done" x="1350" y="540" width="360" height="50"/>
+  <text class="txt task-text" x="1530" y="565">ดูบิลขายเชื่อ</text>
+  <rect class="box done" x="1350" y="608" width="360" height="50"/>
+  <text class="txt task-text" x="1530" y="633">ดูสินค้าในแต่ละบิล</text>
+  <rect class="box done" x="1350" y="676" width="360" height="50"/>
+  <text class="txt task-text" x="1530" y="701">ขายเชื่อผ่าน POS</text>
+  <rect class="box done" x="1350" y="744" width="360" height="50"/>
+  <text class="txt task-text" x="1530" y="769">ตรวจวงเงินและหนี้เกินกำหนด</text>
+  <rect class="box done" x="1350" y="812" width="360" height="50"/>
+  <text class="txt task-text" x="1530" y="837">รับชำระหนี้</text>
+
+  <!-- จัดการบัญชีพนักงาน -->
+  <rect class="box header" x="1870" y="235" width="460" height="62"/>
+  <text class="txt header-text" x="2100" y="266">จัดการบัญชีพนักงาน</text>
+  <path class="line" d="M2100 297 V340 H1920 V726 M1920 361 H1950 M1920 429 H1950 M1920 497 H1950 M1920 565 H1950 M1920 633 H1950 M1920 701 H1950"/>
+  <rect class="box done" x="1950" y="336" width="360" height="50"/>
+  <text class="txt task-text" x="2130" y="361">เพิ่มพนักงาน</text>
+  <rect class="box done" x="1950" y="404" width="360" height="50"/>
+  <text class="txt task-text" x="2130" y="429">แก้ไขข้อมูลพนักงาน</text>
+  <rect class="box done" x="1950" y="472" width="360" height="50"/>
+  <text class="txt task-text" x="2130" y="497">กำหนดบทบาทและสิทธิ์</text>
+  <rect class="box done" x="1950" y="540" width="360" height="50"/>
+  <text class="txt task-text" x="2130" y="565">เปลี่ยนรหัสผ่าน</text>
+  <rect class="box done" x="1950" y="608" width="360" height="50"/>
+  <text class="txt task-text" x="2130" y="633">ปิดใช้งานบัญชี</text>
+  <rect class="box alert" x="1950" y="676" width="360" height="50"/>
+  <text class="txt task-text" x="2130" y="701">ลบพนักงานถาวร</text>
+
+  <!-- คำอธิบายสี -->
+  <circle cx="820" cy="1000" r="22" fill="#a9d98e" stroke="#78b25d" stroke-width="2"/>
+  <text class="txt legend-text" x="865" y="1000">เสร็จและตรวจสอบแล้ว</text>
+  <circle cx="1320" cy="1000" r="22" fill="#ffc5c5" stroke="#dc4c4c" stroke-width="2"/>
+  <text class="txt legend-text" x="1365" y="1000">ยังไม่เสร็จดีหรือยังตรวจสอบไม่ครบ</text>
+</svg>
