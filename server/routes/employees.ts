@@ -86,6 +86,27 @@ employeesRouter.get("/", asyncHandler(async (request, response) => {
   response.json({ success: true, data: employees });
 }));
 
+employeesRouter.get("/:id", asyncHandler(async (request, response) => {
+  const userId = Number(request.params.id);
+  if (!Number.isInteger(userId) || userId <= 0) throw new ApiError(400, "รหัสพนักงานไม่ถูกต้อง");
+  const [employees] = await pool.query<EmployeeRow[]>(`
+    SELECT
+      u.user_id AS id,
+      u.username AS email,
+      u.full_name AS fullName,
+      LOWER(r.role_name) AS role,
+      (u.status = 'ACTIVE') AS isActive,
+      u.last_login_at AS lastLoginAt
+    FROM users u
+    INNER JOIN roles r ON r.role_id = u.role_id
+    WHERE u.user_id = ?
+    LIMIT 1
+  `, [userId]);
+  const employee = employees[0];
+  if (!employee) throw new ApiError(404, "ไม่พบพนักงาน");
+  response.json({ success: true, data: employee });
+}));
+
 employeesRouter.post("/", asyncHandler(async (request, response) => {
   const body = request.body as EmployeeInput;
   const email = requiredText(body.email, "อีเมล").toLowerCase();
